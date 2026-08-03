@@ -47,7 +47,7 @@ class TestConnectionCommand extends Command
         $this->line("\n[1/2] A tentar autenticação OAuth2 (Client Credentials)...");
 
         try {
-            $authReq = Http::asForm()->post($host . '/oauth/token', [
+            $authReq = Http::withOptions(['verify' => config('acapapay.verify_ssl')])->asForm()->post($host . '/oauth/token', [
                 'grant_type' => 'client_credentials',
                 'client_id' => $clientId,
                 'client_secret' => $clientSecret,
@@ -65,7 +65,7 @@ class TestConnectionCommand extends Command
 
             $this->line("\n[2/2] A testar endpoint de Ping (Validar Permissões da API)...");
 
-            $pingReq = Http::withToken($token)->get($apiHost . '/v1/ping');
+            $pingReq = Http::withOptions(['verify' => config('acapapay.verify_ssl')])->withToken($token)->get($apiHost . '/v1/ping');
 
             if (!$pingReq->successful()) {
                 $this->error('✘ FALHA NO PING DA API');

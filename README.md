@@ -54,6 +54,9 @@ ACAPAPAY_CLIENT_SECRET=super_secret_string...
 # (Opcional) A chave HMAC para assinar Webhooks.
 # Essencial para garantir que os Webhooks vêm legitimamente do AcapaPay.
 ACAPAPAY_WEBHOOK_SECRET=hmac_secret_aqui...
+
+# (Opcional) Desativa verificação SSL (útil para desenvolvimento local)
+# ACAPAPAY_VERIFY_SSL=false
 ```
 
 ---
