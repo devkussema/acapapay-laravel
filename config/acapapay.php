@@ -44,4 +44,13 @@ return [
     | Desativar (false) apenas em ambiente local com certificados self-signed.
     */
     'verify_ssl' => env('ACAPAPAY_VERIFY_SSL', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Model de Planos de Faturação
+    |--------------------------------------------------------------------------
+    | Define qual é a Model (ex: \App\Models\Plan::class) na tua aplicação que
+    | representa os planos. Utilizado pelo comando acapapay:sync-plans.
+    */
+    'plan_model' => null,
 ];

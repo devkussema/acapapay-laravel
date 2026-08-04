@@ -52,6 +52,7 @@ class AcapaPayServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \AcapaPay\Laravel\Console\Commands\TestConnectionCommand::class,
+                \AcapaPay\Laravel\Commands\SyncPlansCommand::class,
             ]);
         }
     }

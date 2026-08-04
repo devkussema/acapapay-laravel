@@ -88,4 +88,41 @@ class AcapaPayManager
 
         return $invoiceReq->json();
     }
+
+    /**
+     * Sincroniza os planos de faturação locais com o AcapaPay.
+     * 
+     * @param array $plans Lista de planos
+     * @return array Resposta da API com os planos atualizados
+     */
+    public function syncPlans(array $plans)
+    {
+        // 1. Obter o Access Token (via Client Credentials)
+        $authReq = Http::withOptions(['verify' => config('acapapay.verify_ssl')])->asForm()
+            ->post(config('acapapay.host') . '/oauth/token', [
+                'grant_type' => 'client_credentials',
+                'client_id' => config('acapapay.client_id'),
+                'client_secret' => config('acapapay.client_secret'),
+            ]);
+
+        if (!$authReq->successful()) {
+            throw new \Exception('AcapaPay SDK: Falha na autenticação OAuth para sincronizar planos.');
+        }
+
+        $token = $authReq->json('access_token');
+
+        // 2. Enviar a lista de planos para sincronização
+        $syncReq = Http::withOptions(['verify' => config('acapapay.verify_ssl')])
+            ->withToken($token)
+            ->put(config('acapapay.api_host') . '/v1/billing/plans', [
+                'plans' => $plans
+            ]);
+
+        if (!$syncReq->successful()) {
+            Log::error('AcapaPay Erro SyncPlans: ' . $syncReq->body());
+            throw new \Exception('AcapaPay SDK: Falha ao sincronizar planos com o servidor AcapaPay.');
+        }
+
+        return $syncReq->json('plans') ?? [];
+    }
 }
