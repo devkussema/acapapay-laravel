@@ -55,4 +55,37 @@ class AcapaPayManager
 
         return $checkoutReq->json('url');
     }
+
+    /**
+     * Verifica o estado de uma fatura utilizando a API M2M do AcapaPay.
+     * Útil para fallback síncrono após redirecionamento.
+     */
+    public function getInvoiceStatus(string $invoiceId)
+    {
+        // 1. Obter o Access Token (via Client Credentials)
+        $authReq = Http::withOptions(['verify' => config('acapapay.verify_ssl')])->asForm()
+            ->post(config('acapapay.host') . '/oauth/token', [
+                'grant_type' => 'client_credentials',
+                'client_id' => config('acapapay.client_id'),
+                'client_secret' => config('acapapay.client_secret'),
+            ]);
+
+        if (!$authReq->successful()) {
+            throw new \Exception('AcapaPay SDK: Falha na autenticação OAuth para verificar fatura.');
+        }
+
+        $token = $authReq->json('access_token');
+
+        // 2. Consultar o estado da fatura
+        $invoiceReq = Http::withOptions(['verify' => config('acapapay.verify_ssl')])
+            ->withToken($token)
+            ->get(config('acapapay.api_host') . '/v1/billing/invoices/' . $invoiceId);
+
+        if (!$invoiceReq->successful()) {
+            Log::error('AcapaPay Erro GetInvoice: ' . $invoiceReq->body());
+            throw new \Exception('AcapaPay SDK: Falha ao comunicar com o servidor de pagamento para verificar a fatura.');
+        }
+
+        return $invoiceReq->json();
+    }
 }
