@@ -11,6 +11,15 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Ambiente (Modo)
+    |--------------------------------------------------------------------------
+    | 'production' para pagamentos reais.
+    | 'sandbox' para simulação de pagamentos sem faturar de verdade.
+    */
+    'modo' => env('ACAPAPAY_MODO', 'production'),
+
+    /*
+    |--------------------------------------------------------------------------
     | AcapaPay Client Secret
     |--------------------------------------------------------------------------
     | A chave super secreta OAuth da tua aplicação.

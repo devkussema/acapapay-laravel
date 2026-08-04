@@ -38,6 +38,11 @@ class AcapaPayManager
         // Informar o Host de origem para o SSO permitir o Iframe
         $originDomain = request()->getSchemeAndHttpHost();
 
+        // Injetar modo sandbox se estiver ativado
+        if (config('acapapay.modo') === 'sandbox') {
+            $metadata['sandbox_mode'] = true;
+        }
+
         // 2. Pedir uma Sessão de Checkout
         $checkoutReq = Http::withOptions(['verify' => config('acapapay.verify_ssl')])->withToken($token)->post(config('acapapay.api_host') . '/v1/checkout/sessions', [
             'user_id' => $userId,
