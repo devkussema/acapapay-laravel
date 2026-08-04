@@ -129,7 +129,7 @@ No teu ficheiro de View (ex: `resources/views/pagamento/checkout.blade.php`), in
     <h1>Concluir Pagamento</h1>
     
     <!-- Renderiza o Checkout Seguro do AcapaPay -->
-    <x-acapapay::iframe :url="$urlDePagamento" />
+    <x-acapapay::iframe :checkout-url="$urlDePagamento" />
     
 </x-layout>
 ```
