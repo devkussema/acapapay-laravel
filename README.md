@@ -179,6 +179,97 @@ public function handle(AcapaPayInvoicePaid $event)
 
 ---
 
+## 7. Pagamentos em USD e Criptomoedas (RedotPay)
+
+O AcapaPay suporta pagamentos em **Dólar Americano (USD)** e **criptomoedas (stablecoins)** através da integração com a **RedotPay**. Isto permite que os teus utilizadores paguem com USDT, USDC e outros activos digitais, enquanto tu recebes o settlement na tua moeda local.
+
+### Checkout com USD/Cripto
+
+Para iniciar um pagamento em dólar via RedotPay, basta especificares a moeda e o método preferido:
+
+```php
+use AcapaPay\Laravel\Facades\AcapaPay;
+
+$url = AcapaPay::checkoutSession(
+    userId: auth()->id(),
+    planReference: 'PRO_YEARLY',
+    metadata: ['projeto' => 'minha-app'],
+    successUrl: url('/pagamento/sucesso'),
+    cancelUrl: url('/pagamento/cancelado'),
+    currency: 'USD',                // Forçar checkout em dólares
+    preferredMethod: 'RDP'           // Pré-selecionar RedotPay/cripto
+);
+
+return redirect($url);
+```
+
+### Fatura Avulsa em USD
+
+Para cobrar um montante específico sem estar associado a um plano:
+
+```php
+$url = AcapaPay::createInvoice(
+    userId: auth()->id(),
+    amount: 49.99,
+    description: 'Consultoria Premium - 1 hora',
+    currency: 'USD',
+    preferredMethod: 'RDP',
+    metadata: ['sessao_id' => $sessaoId],
+    successUrl: url('/pagamento/sucesso'),
+    cancelUrl: url('/pagamento/cancelado')
+);
+
+return redirect($url);
+```
+
+### Configuração Global de Moeda
+
+Se a tua aplicação cobra exclusivamente em USD, podes definir a moeda e método padrão no `.env`:
+
+```env
+ACAPAPAY_PREFERRED_CURRENCY=USD
+ACAPAPAY_PREFERRED_METHOD=RDP
+```
+
+Assim, não precisas de especificar `currency` e `preferredMethod` em cada chamada.
+
+---
+
+## 8. Eventos Adicionais
+
+Além do `AcapaPayInvoicePaid`, o SDK dispara eventos para cenários de falha e expiração:
+
+| Evento | Quando é disparado |
+|--------|--------------------|
+| `AcapaPayInvoicePaid` | Fatura paga com sucesso |
+| `AcapaPayInvoiceFailed` | Pagamento recusado pela gateway |
+| `AcapaPayInvoiceExpired` | Fatura expirou sem pagamento |
+
+### Exemplo de Listener para Falhas:
+
+```php
+use AcapaPay\Laravel\Events\AcapaPayInvoiceFailed;
+
+protected $listen = [
+    AcapaPayInvoiceFailed::class => [
+        \App\Listeners\NotificarFalhaPagamento::class,
+    ],
+];
+```
+
+```php
+public function handle(AcapaPayInvoiceFailed $event)
+{
+    // $event->invoiceId - ID da fatura
+    // $event->reason - Razão da falha
+    // $event->metadata - Metadados originais
+    
+    // Notificar o utilizador, reverter acções, etc.
+}
+```
+
+---
+
 ## Licença
 
 Distribuído sob a licença **MIT**.
