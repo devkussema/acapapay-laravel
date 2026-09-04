@@ -2,41 +2,71 @@
 
 namespace AcapaPay\Laravel;
 
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use AcapaPay\Laravel\Http\AcapaPayClient;
+use AcapaPay\Laravel\Http\DirectPaymentApi;
 
 class AcapaPayManager
 {
+    protected AcapaPayClient $client;
+
+    protected ?DirectPaymentApi $directApi = null;
+
     /**
-     * Obtém um token OAuth2 (Client Credentials) com cache para evitar
-     * chamadas redundantes ao servidor de autenticação.
-     * O token é cacheado por 50 minutos (tokens OAuth2 expiram tipicamente em 60 min).
+     * O cliente é opcional para manter a compatibilidade com quem faz
+     * `new AcapaPayManager()` directamente.
+     */
+    public function __construct(?AcapaPayClient $client = null)
+    {
+        $this->client = $client ?: new AcapaPayClient();
+    }
+
+    /**
+     * API de pagamento direta — permite criar faturas e cobranças e construir
+     * o teu próprio ecrã de checkout, sem redirecionar nem usar iFrame.
+     *
+     * @since 1.2.0
+     */
+    public function direct(): DirectPaymentApi
+    {
+        return $this->directApi ??= new DirectPaymentApi($this->client);
+    }
+
+    /**
+     * Alias legível de direct(): AcapaPay::invoices()->status($id)
+     *
+     * @since 1.2.0
+     */
+    public function invoices(): DirectPaymentApi
+    {
+        return $this->direct();
+    }
+
+    /**
+     * Testa a conectividade com a API do AcapaPay.
+     *
+     * @since 1.2.0
+     */
+    public function ping(): array
+    {
+        return $this->client->ping();
+    }
+
+    /**
+     * Obtém um token OAuth2 (Client Credentials), com cache.
+     *
+     * Mantido com a mesma assinatura e visibilidade das versões anteriores,
+     * para não quebrar subclasses; delega no AcapaPayClient.
      */
     protected function getAccessToken(): string
     {
-        $cacheKey = 'acapapay_oauth_token_' . md5(config('acapapay.client_id'));
-
-        return Cache::remember($cacheKey, 3000, function () {
-            $response = Http::withOptions(['verify' => config('acapapay.verify_ssl')])
-                ->asForm()
-                ->post(config('acapapay.host') . '/oauth/token', [
-                    'grant_type'    => 'client_credentials',
-                    'client_id'     => config('acapapay.client_id'),
-                    'client_secret' => config('acapapay.client_secret'),
-                ]);
-
-            if (!$response->successful()) {
-                // Não cachear tokens falhados
-                throw new \Exception('AcapaPay SDK: Falha na autenticação OAuth. Verifica as tuas credenciais no .env.');
-            }
-
-            return $response->json('access_token');
-        });
+        return $this->client->token();
     }
 
     /**
      * Executa um pedido HTTP autenticado à API do AcapaPay.
+     *
+     * Mantido com a mesma assinatura e visibilidade das versões anteriores;
+     * delega no AcapaPayClient.
      *
      * @param string $method Método HTTP (GET, POST, PUT, DELETE)
      * @param string $uri    URI relativa (ex: /v1/checkout/sessions)
@@ -45,27 +75,7 @@ class AcapaPayManager
      */
     protected function apiRequest(string $method, string $uri, array $data = []): array
     {
-        $token = $this->getAccessToken();
-        $url = config('acapapay.api_host') . $uri;
-
-        $response = Http::withOptions(['verify' => config('acapapay.verify_ssl')])
-            ->withToken($token)
-            ->send($method, $url, ['json' => $data]);
-
-        if (!$response->successful()) {
-            // Invalidar cache do token se receber 401 (token expirado)
-            if ($response->status() === 401) {
-                Cache::forget('acapapay_oauth_token_' . md5(config('acapapay.client_id')));
-            }
-            Log::error('AcapaPay SDK Erro API: ' . $response->body(), [
-                'method' => $method,
-                'uri' => $uri,
-                'status' => $response->status(),
-            ]);
-            throw new \Exception('AcapaPay SDK: Falha na comunicação com o servidor de pagamento. Status: ' . $response->status());
-        }
-
-        return $response->json() ?? [];
+        return $this->client->request($method, $uri, $data);
     }
 
     /**
@@ -95,7 +105,7 @@ class AcapaPayManager
         $cancelUrl = $cancelUrl ?: url('/acapapay/cancel');
 
         // Informar o Host de origem para o SSO permitir o Iframe
-        $originDomain = request()->getSchemeAndHttpHost();
+        $originDomain = $this->originDomain();
 
         // Injetar modo sandbox se estiver ativado
         if (config('acapapay.modo') === 'sandbox') {
@@ -163,23 +173,54 @@ class AcapaPayManager
             $metadata['sandbox_mode'] = true;
         }
 
+        // O endpoint /v1/billing/invoices espera customer_name + items[] — não
+        // {amount, description}. Traduzimos aqui para manter esta assinatura
+        // simples, que é a que faz sentido para um pagamento avulso.
         $body = [
-            'user_id'     => $userId,
-            'amount'      => round($amount, 2),
-            'description' => $description,
-            'currency'    => $currency,
-            'success_url' => $successUrl,
-            'cancel_url'  => $cancelUrl,
-            'metadata'    => $metadata,
+            'customer_name' => $metadata['customer_name'] ?? ('user:' . $userId),
+            'currency'      => $currency,
+            'items'         => [[
+                'description' => $description,
+                'quantity'    => 1,
+                'unit_price'  => round($amount, 2),
+            ]],
+            'app_reference' => (string) $userId,
+            'success_url'   => $successUrl,
+            'cancel_url'    => $cancelUrl,
+            'origin_domain' => $this->originDomain(),
+            'metadata'      => $metadata,
         ];
+
+        if (!empty($metadata['customer_email'])) {
+            $body['customer_email'] = $metadata['customer_email'];
+        }
 
         if ($preferredMethod) {
             $body['preferred_payment_method'] = $preferredMethod;
+        } elseif (config('acapapay.preferred_method')) {
+            $body['preferred_payment_method'] = config('acapapay.preferred_method');
         }
 
         $result = $this->apiRequest('POST', '/v1/billing/invoices', $body);
 
-        return $result['url'] ?? '';
+        return $result['pay_url'] ?? $result['url'] ?? '';
+    }
+
+    /**
+     * Domínio de origem, para o SSO autorizar o iFrame.
+     * Em contexto de consola/fila não há pedido HTTP — usamos o APP_URL.
+     */
+    protected function originDomain(): ?string
+    {
+        try {
+            if (app()->runningInConsole()) {
+                return config('app.url');
+            }
+
+            return request()->getSchemeAndHttpHost();
+        } catch (\Throwable $e) {
+            return config('app.url');
+        }
     }
 
     /**
@@ -205,5 +246,24 @@ class AcapaPayManager
         $result = $this->apiRequest('PUT', '/v1/billing/plans', ['plans' => $plans]);
 
         return $result['plans'] ?? [];
+    }
+
+    /**
+     * Atalho: cria uma fatura em USD e gera logo a cobrança em criptomoeda
+     * (RedotPay), devolvendo o link de pagamento pronto a usar.
+     *
+     * Equivale a direct()->createInvoice(...) seguido de ->chargeWithCrypto(...).
+     *
+     * @param array<string, mixed> $invoiceAttributes Ver DirectPaymentApi::createInvoice()
+     *
+     * @since 1.2.0
+     */
+    public function createCryptoCharge(array $invoiceAttributes): \AcapaPay\Laravel\Support\ChargeResult
+    {
+        $invoiceAttributes['currency'] = $invoiceAttributes['currency'] ?? \AcapaPay\Laravel\Enums\Currency::USD;
+
+        $invoice = $this->direct()->createInvoice($invoiceAttributes);
+
+        return $this->direct()->chargeWithCrypto((string) $invoice['invoice_id']);
     }
 }

@@ -25,10 +25,19 @@ class AcapaPayServiceProvider extends ServiceProvider
             __DIR__.'/../config/acapapay.php', 'acapapay'
         );
 
+        // Cliente HTTP partilhado (token OAuth2 em cache, timeouts, retentativas).
+        $this->app->singleton(\AcapaPay\Laravel\Http\AcapaPayClient::class, function ($app) {
+            return new \AcapaPay\Laravel\Http\AcapaPayClient();
+        });
+
         // Regista a classe para a Facade
         $this->app->singleton('acapapay', function ($app) {
-            return new AcapaPayManager();
+            return new AcapaPayManager($app->make(\AcapaPay\Laravel\Http\AcapaPayClient::class));
         });
+
+        // Permite injectar AcapaPayManager por type-hint no construtor, resolvendo
+        // para o mesmo singleton que a Facade usa.
+        $this->app->alias('acapapay', AcapaPayManager::class);
     }
 
     /**
@@ -41,6 +50,12 @@ class AcapaPayServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/acapapay.php' => config_path('acapapay.php'),
         ], 'acapapay-config');
+
+        // Permite personalizar o componente iFrame:
+        // php artisan vendor:publish --tag="acapapay-views"
+        $this->publishes([
+            __DIR__.'/../resources/views' => resource_path('views/vendor/acapapay'),
+        ], 'acapapay-views');
 
         // Carregar Vistas (Blade Component para o Iframe)
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'acapapay');

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use AcapaPay\Laravel\Events\AcapaPayInvoicePaid;
 use AcapaPay\Laravel\Events\AcapaPayInvoiceFailed;
 use AcapaPay\Laravel\Events\AcapaPayInvoiceExpired;
+use AcapaPay\Laravel\Events\AcapaPayPaymentReceived;
 
 class WebhookController extends Controller
 {
@@ -54,21 +55,42 @@ class WebhookController extends Controller
      */
     private function handleInvoicePaid(array $data): void
     {
-        // Extrair Estrutura Acapadev moderna
-        $metadata = $data['data']['metadata'] ?? [];
-        $subscriptionData = $data['data']['subscription'] ?? null;
-        
-        if (!$subscriptionData) {
-            throw new \Exception("AcapaPay SDK: A subscrição está omissa no Payload recebido.");
-        }
+        $payload = $data['data'] ?? [];
+        $metadata = $payload['metadata'] ?? [];
+        $subscriptionData = $payload['subscription'] ?? null;
 
-        $subscriptionId = $subscriptionData['id'];
+        $subscriptionId = $subscriptionData['id'] ?? null;
         $expiresAt = $subscriptionData['expires_at'] ?? null;
 
-        // Disparar um Evento Global Nativo no Laravel da app Satélite
-        event(new AcapaPayInvoicePaid($subscriptionId, $metadata, $expiresAt, $data));
-        
-        Log::info("AcapaPay SDK: Webhook invoice.paid validado e evento AcapaPayInvoicePaid disparado com sucesso.");
+        // AcapaPayPaymentReceived cobre TODOS os pagamentos — com ou sem subscrição.
+        // É o evento a usar em apps que aceitam pagamentos avulsos (ex: USD/cripto
+        // via RedotPay), que nunca trazem subscrição no payload.
+        event(new AcapaPayPaymentReceived(
+            $payload['invoice_id'] ?? null,
+            $subscriptionId,
+            $metadata,
+            $expiresAt,
+            $payload['payment_method'] ?? null,
+            $payload['currency'] ?? null,
+            $payload['total'] ?? null,
+            $data
+        ));
+
+        // AcapaPayInvoicePaid mantém o significado que sempre teve — "uma subscrição
+        // foi paga" — por isso só dispara quando existe mesmo uma subscrição. Assim os
+        // listeners já existentes continuam a receber um subscriptionId válido e nunca
+        // são invocados com null (o que faria um Subscription::where(...) falhar em
+        // silêncio). Um pagamento avulso deixa de rebentar o webhook: antes lançava
+        // uma excepção aqui, devolvia HTTP 500, e o SSO reenviava indefinidamente.
+        if ($subscriptionId !== null) {
+            event(new AcapaPayInvoicePaid($subscriptionId, $metadata, $expiresAt, $data));
+
+            Log::info('AcapaPay SDK: Webhook invoice.paid (subscrição) processado — eventos AcapaPayPaymentReceived e AcapaPayInvoicePaid disparados.');
+
+            return;
+        }
+
+        Log::info('AcapaPay SDK: Webhook invoice.paid (pagamento avulso) processado — evento AcapaPayPaymentReceived disparado.');
     }
 
     /**

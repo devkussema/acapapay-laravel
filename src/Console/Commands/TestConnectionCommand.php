@@ -46,33 +46,17 @@ class TestConnectionCommand extends Command
 
         $this->line("\n[1/2] A tentar autenticação OAuth2 (Client Credentials)...");
 
+        // Usa o mesmo cliente (e a mesma cache de token) que o resto do SDK,
+        // em vez de repetir aqui a lógica de autenticação.
+        $client = app(\AcapaPay\Laravel\Http\AcapaPayClient::class);
+
         try {
-            $authReq = Http::withOptions(['verify' => config('acapapay.verify_ssl')])->asForm()->post($host . '/oauth/token', [
-                'grant_type' => 'client_credentials',
-                'client_id' => $clientId,
-                'client_secret' => $clientSecret,
-            ]);
-
-            if (!$authReq->successful()) {
-                $this->error('✘ FALHA NA AUTENTICAÇÃO');
-                $this->line('O SSO rejeitou as credenciais. Erro do Servidor:');
-                $this->error($authReq->body());
-                return Command::FAILURE;
-            }
-
-            $token = $authReq->json('access_token');
+            $client->token(fresh: true);
             $this->info('✔ Sucesso! Access Token obtido.');
 
             $this->line("\n[2/2] A testar endpoint de Ping (Validar Permissões da API)...");
 
-            $pingReq = Http::withOptions(['verify' => config('acapapay.verify_ssl')])->withToken($token)->get($apiHost . '/v1/ping');
-
-            if (!$pingReq->successful()) {
-                $this->error('✘ FALHA NO PING DA API');
-                $this->line('As credenciais foram aceites, mas o endpoint rejeitou o token.');
-                $this->error($pingReq->body());
-                return Command::FAILURE;
-            }
+            $client->ping();
 
             $this->info('✔ Sucesso! A API do SSO respondeu corretamente.');
             $this->newLine();
@@ -83,10 +67,24 @@ class TestConnectionCommand extends Command
 
             return Command::SUCCESS;
 
-        } catch (\Exception $e) {
-            $this->error('✘ ERRO DE REDE / EXCEÇÃO CATASTRÓFICA');
+        } catch (\AcapaPay\Laravel\Exceptions\AuthenticationException $e) {
+            $this->error('✘ FALHA NA AUTENTICAÇÃO');
+            $this->line('O SSO rejeitou as credenciais. Confirma ACAPAPAY_CLIENT_ID e ACAPAPAY_CLIENT_SECRET.');
+            $this->error($e->getMessage());
+            return Command::FAILURE;
+        } catch (\AcapaPay\Laravel\Exceptions\ConnectionException $e) {
+            $this->error('✘ ERRO DE REDE');
             $this->error($e->getMessage());
             $this->line('Poderá ser um problema de DNS, Servidor SSO offline ou certificado SSL inválido se for local.');
+            return Command::FAILURE;
+        } catch (\AcapaPay\Laravel\Exceptions\ApiException $e) {
+            $this->error('✘ FALHA NO PING DA API (HTTP ' . $e->status() . ')');
+            $this->line('As credenciais foram aceites, mas o endpoint recusou o pedido.');
+            $this->error($e->apiError() ?: $e->body());
+            return Command::FAILURE;
+        } catch (\Exception $e) {
+            $this->error('✘ ERRO INESPERADO');
+            $this->error($e->getMessage());
             return Command::FAILURE;
         }
     }

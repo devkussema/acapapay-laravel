@@ -82,4 +82,44 @@ return [
     | 'EKZ' (E-Kwanza), 'RDP' (RedotPay/Cripto). Deixar null para mostrar todos.
     */
     'preferred_method' => env('ACAPAPAY_PREFERRED_METHOD', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cliente HTTP
+    |--------------------------------------------------------------------------
+    | Timeouts (segundos) e retentativas usados em todas as chamadas à API.
+    | Só falhas de rede são repetidas — um erro de validação (422) nunca é.
+    */
+    'timeout' => env('ACAPAPAY_TIMEOUT', 30),
+    'connect_timeout' => env('ACAPAPAY_CONNECT_TIMEOUT', 10),
+    'retry_times' => env('ACAPAPAY_RETRY_TIMES', 2),
+    'retry_sleep' => env('ACAPAPAY_RETRY_SLEEP', 200), // milissegundos
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tempo de vida do token OAuth2 em cache (segundos)
+    |--------------------------------------------------------------------------
+    | Os tokens do AcapaPay expiram tipicamente em 60 minutos; guardamos por 50.
+    */
+    'token_ttl' => env('ACAPAPAY_TOKEN_TTL', 3000),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Intervalo de polling do estado da fatura (segundos)
+    |--------------------------------------------------------------------------
+    | O servidor só consulta o gateway externo uma vez a cada 15 segundos por
+    | fatura, por isso não vale a pena perguntar mais depressa do que isto.
+    */
+    'status_poll_interval' => env('ACAPAPAY_STATUS_POLL_INTERVAL', 15),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Origens autorizadas para o componente iFrame
+    |--------------------------------------------------------------------------
+    | O componente <x-acapapay::iframe> só aceita mensagens postMessage vindas
+    | destas origens. O domínio do próprio checkout e o ACAPAPAY_HOST são
+    | sempre aceites — só precisas de acrescentar aqui origens adicionais.
+    | Exemplo: ['https://pay.acapadev.com']
+    */
+    'iframe_allowed_origins' => [],
 ];

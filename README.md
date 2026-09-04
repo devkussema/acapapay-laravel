@@ -57,6 +57,20 @@ ACAPAPAY_WEBHOOK_SECRET=hmac_secret_aqui...
 
 # (Opcional) Desativa verificação SSL (útil para desenvolvimento local)
 # ACAPAPAY_VERIFY_SSL=false
+
+# (Opcional) 'sandbox' permite simular pagamentos sem cobrar nada.
+# Deixa em 'production' (padrão) para pagamentos reais.
+# ACAPAPAY_MODO=sandbox
+
+# (Opcional) Moeda e método padrão, se a tua app cobra sempre da mesma forma.
+# Ex: uma app que só cobra em cripto/USD:
+# ACAPAPAY_PREFERRED_CURRENCY=USD
+# ACAPAPAY_PREFERRED_METHOD=RDP
+
+# (Opcional) Timeouts e retentativas das chamadas à API
+# ACAPAPAY_TIMEOUT=30
+# ACAPAPAY_CONNECT_TIMEOUT=10
+# ACAPAPAY_RETRY_TIMES=2
 ```
 
 ---
@@ -167,15 +181,27 @@ Dentro do teu *Listener* (`MarcarFaturaComoPaga.php`):
 ```php
 public function handle(AcapaPayInvoicePaid $event)
 {
-    $payload = $event->payload;
-    
-    $localUserId = $payload['metadata']['local_user_id'];
-    $faturaId = $payload['invoice_id'];
-    
+    // Propriedades disponíveis no evento:
+    $subscriptionId = $event->subscriptionId;   // ID da subscrição no AcapaPay
+    $metadata       = $event->metadata;          // Os metadados que enviaste no checkout
+    $expiresAt      = $event->expiresAt;         // Validade da subscrição (ISO 8601)
+    $payload        = $event->invoicePayload;    // Payload completo do webhook
+
+    $localUserId = $metadata['local_user_id'] ?? null;
+
+    // Protege contra reprocessamento (o SSO pode reenviar o mesmo webhook):
+    if (Subscription::where('acapapay_id', $subscriptionId)->exists()) {
+        return;
+    }
+
     // Atualiza a tua Base de Dados local:
     // Order::where('user_id', $localUserId)->update(['status' => 'paid']);
 }
 ```
+
+> ⚠️ **Atenção:** o `AcapaPayInvoicePaid` só é disparado em pagamentos **de subscrição**.
+> Se a tua app também aceita pagamentos avulsos (por exemplo em USD/cripto), usa o
+> evento `AcapaPayPaymentReceived` descrito na [secção 8](#8-eventos-disponíveis).
 
 ---
 
@@ -233,17 +259,167 @@ ACAPAPAY_PREFERRED_METHOD=RDP
 
 Assim, não precisas de especificar `currency` e `preferredMethod` em cada chamada.
 
+### Constantes em vez de strings
+
+Para evitares erros de escrita, usa as constantes em vez de `'RDP'`/`'USD'`:
+
+```php
+use AcapaPay\Laravel\Enums\PaymentMethod;
+use AcapaPay\Laravel\Enums\Currency;
+
+AcapaPay::checkoutSession(
+    userId: auth()->id(),
+    planReference: 'PRO_YEARLY',
+    currency: Currency::USD,
+    preferredMethod: PaymentMethod::RDP,
+);
+```
+
+| Constante | Valor | Método | Moeda | Validade da cobrança |
+|---|---|---|---|---|
+| `PaymentMethod::REF` | `REF` | Referência Multicaixa | AOA | ~3 dias |
+| `PaymentMethod::GPO` | `GPO` | Multicaixa Express | AOA | 60 segundos |
+| `PaymentMethod::EKZ` | `EKZ` | E-Kwanza | AOA | 5 minutos |
+| `PaymentMethod::RDP` | `RDP` | **RedotPay (cripto)** | **USD** | 1 hora |
+
+> A RedotPay **exige** faturas em USD. Se criares uma fatura em AOA e pedires `RDP`,
+> a API devolve `422` com uma mensagem explícita.
+
 ---
 
-## 8. Eventos Adicionais
+## 8. API de Pagamento Direta (checkout próprio, sem iFrame)
 
-Além do `AcapaPayInvoicePaid`, o SDK dispara eventos para cenários de falha e expiração:
+As secções anteriores usam o **checkout hospedado**: o utilizador é redirecionado (ou vê um iFrame) com a página de pagamento do AcapaPay.
+
+Se preferires desenhar **a tua própria interface de pagamento** — mostrando a referência Multicaixa, o ticket E-Kwanza ou o link de cripto dentro da tua app — usa a **API direta**.
+
+### Fluxo
+
+```
+createInvoice()  →  charge()  →  status()  (polling)
+                                     ↕
+                          webhook invoice.paid (confirmação fiável)
+```
+
+### Exemplo completo: checkout em cripto próprio
+
+```php
+use AcapaPay\Laravel\Facades\AcapaPay;
+use AcapaPay\Laravel\Enums\Currency;
+use AcapaPay\Laravel\Enums\PaymentMethod;
+
+// 1. Criar a fatura
+$invoice = AcapaPay::direct()->createInvoice([
+    'customer_name'  => $user->name,
+    'customer_email' => $user->email,
+    'currency'       => Currency::USD,
+    'app_reference'  => "pedido-{$order->id}",
+    'items'          => [
+        ['description' => 'Plano PRO (anual)', 'quantity' => 1, 'unit_price' => 120.00],
+    ],
+]);
+
+// 2. Gerar a cobrança em criptomoeda
+$charge = AcapaPay::direct()->charge($invoice['invoice_id'], PaymentMethod::RDP);
+
+// 3. Mostrar ao utilizador na tua própria UI
+return view('checkout', [
+    'payUrl'    => $charge->payUrl(),      // link de pagamento da RedotPay
+    'expiresAt' => $charge->expiresAt(),   // até quando é válido
+    'invoiceId' => $invoice['invoice_id'],
+]);
+```
+
+Ou, num único passo:
+
+```php
+$charge = AcapaPay::createCryptoCharge([
+    'customer_name' => $user->name,
+    'items' => [['description' => 'Plano PRO', 'quantity' => 1, 'unit_price' => 120.00]],
+]);
+
+return redirect($charge->payUrl());
+```
+
+### Verificar o estado (polling)
+
+```php
+$status = AcapaPay::direct()->status($invoiceId);
+// ['invoice_status' => 'pending'|'paid', 'paid_at' => ..., 'transaction' => [...]]
+
+if (AcapaPay::direct()->isPaid($invoiceId)) {
+    // ...
+}
+```
+
+> O servidor só consulta a gateway externa **uma vez a cada 15 segundos** por fatura.
+> Não vale a pena perguntar mais depressa — e usa sempre o **webhook** como confirmação
+> definitiva; o polling serve apenas para dar feedback imediato na interface.
+
+### Testar sem dinheiro real (sandbox)
+
+Com `ACAPAPAY_MODO=sandbox`, podes marcar uma fatura como paga instantaneamente. Isto dispara o webhook `invoice.paid` tal como um pagamento real:
+
+```php
+AcapaPay::direct()->simulate($invoiceId);
+```
+
+### Referência dos métodos
+
+| Método | Descrição |
+|---|---|
+| `AcapaPay::direct()->createInvoice(array $attributes)` | Cria a fatura. Devolve `invoice_id`, `pay_url`, `total`, `currency`. |
+| `AcapaPay::direct()->charge($invoiceId, $method, $phone = null)` | Gera a cobrança. Devolve um `ChargeResult`. |
+| `AcapaPay::direct()->chargeWithCrypto($invoiceId)` | Atalho para `charge(..., PaymentMethod::RDP)`. |
+| `AcapaPay::direct()->status($invoiceId)` | Estado atual da fatura. |
+| `AcapaPay::direct()->isPaid($invoiceId)` | `true` se já estiver paga. |
+| `AcapaPay::direct()->find($invoiceId)` | Detalhe completo da fatura. |
+| `AcapaPay::direct()->simulate($invoiceId)` | Marca como paga (só em sandbox). |
+| `AcapaPay::createCryptoCharge(array $attributes)` | Cria fatura em USD + cobrança cripto, num só passo. |
+
+O `ChargeResult` devolvido por `charge()` expõe `payUrl()`, `reference()`, `entity()`, `expiresAt()`, `paymentMethod()`, `isMock()` e `data()` — e também funciona como array (`$charge['data']['pay_url']`).
+
+---
+
+## 9. Eventos Disponíveis
 
 | Evento | Quando é disparado |
 |--------|--------------------|
-| `AcapaPayInvoicePaid` | Fatura paga com sucesso |
+| `AcapaPayPaymentReceived` | **Qualquer** fatura paga — com ou sem subscrição |
+| `AcapaPayInvoicePaid` | Apenas pagamentos **de subscrição** |
 | `AcapaPayInvoiceFailed` | Pagamento recusado pela gateway |
 | `AcapaPayInvoiceExpired` | Fatura expirou sem pagamento |
+
+### Qual devo usar?
+
+- **Só vendes subscrições?** Continua com o `AcapaPayInvoicePaid`. Nada mudou.
+- **Aceitas pagamentos avulsos** (ex: USD/cripto via `createInvoice()` ou pela API direta)?
+  Usa o **`AcapaPayPaymentReceived`** — os pagamentos avulsos não têm subscrição e por isso
+  **não** disparam o `AcapaPayInvoicePaid`.
+
+> Se adotares o `AcapaPayPaymentReceived` **e** mantiveres um listener no `AcapaPayInvoicePaid`,
+> um pagamento de subscrição vai acionar os dois. Usa `$event->isOneOff()` para tratar
+> apenas os avulsos no listener novo e evitar processamento duplicado.
+
+```php
+use AcapaPay\Laravel\Events\AcapaPayPaymentReceived;
+
+public function handle(AcapaPayPaymentReceived $event)
+{
+    if ($event->isSubscription()) {
+        return; // já tratado pelo listener do AcapaPayInvoicePaid
+    }
+
+    // $event->invoiceId     - ID da fatura
+    // $event->amount        - Total pago
+    // $event->currency      - 'AOA' ou 'USD'
+    // $event->paymentMethod - 'REF' | 'GPO' | 'EKZ' | 'RDP'
+    // $event->metadata      - Os teus metadados
+    // $event->isCrypto()    - true se foi pago em criptomoeda
+
+    Order::where('id', $event->metadata['order_id'])->update(['status' => 'paid']);
+}
+```
 
 ### Exemplo de Listener para Falhas:
 
@@ -263,10 +439,48 @@ public function handle(AcapaPayInvoiceFailed $event)
     // $event->invoiceId - ID da fatura
     // $event->reason - Razão da falha
     // $event->metadata - Metadados originais
-    
+
     // Notificar o utilizador, reverter acções, etc.
 }
 ```
+
+---
+
+## 10. Tratamento de Erros
+
+O SDK lança excepções tipadas, todas descendentes de `\Exception` — o teu `catch (\Exception $e)` atual continua a funcionar.
+
+```php
+use AcapaPay\Laravel\Exceptions\ValidationException;
+use AcapaPay\Laravel\Exceptions\AuthenticationException;
+use AcapaPay\Laravel\Exceptions\ConnectionException;
+use AcapaPay\Laravel\Exceptions\ApiException;
+
+try {
+    $charge = AcapaPay::direct()->charge($invoiceId, PaymentMethod::RDP);
+} catch (ValidationException $e) {
+    // 422 — dados recusados. $e->errors() traz os campos em falta.
+    return back()->withErrors($e->errors());
+} catch (AuthenticationException $e) {
+    // Credenciais erradas no .env
+    report($e);
+} catch (ConnectionException $e) {
+    // Rede/DNS/SSL — é seguro voltar a tentar
+    return back()->with('error', 'Serviço temporariamente indisponível.');
+} catch (ApiException $e) {
+    // Qualquer outro erro HTTP: $e->status(), $e->apiError(), $e->isRetryable()
+    report($e);
+}
+```
+
+| Excepção | Significado |
+|---|---|
+| `ValidationException` | 422 — dados inválidos (tem `errors()`) |
+| `AuthenticationException` | Falha no OAuth2 — credenciais erradas |
+| `NotFoundException` | 404 — fatura inexistente ou de outra app |
+| `ForbiddenException` | 403 — operação não permitida (ex: `simulate()` fora de sandbox) |
+| `ConnectionException` | Falha de rede — seguro repetir |
+| `ApiException` | Base das anteriores; qualquer outro erro HTTP |
 
 ---
 
