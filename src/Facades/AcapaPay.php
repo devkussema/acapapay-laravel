@@ -5,7 +5,10 @@ namespace AcapaPay\Laravel\Facades;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @method static string checkoutSession(string|int $userId, string $planReference, array $metadata = [], string $successUrl = null, string $cancelUrl = null)
+ * @method static string checkoutSession(string|int $userId, string $planReference, array $metadata = [], ?string $successUrl = null, ?string $cancelUrl = null, ?string $currency = null, ?string $preferredMethod = null)
+ * @method static string createInvoice(string|int $userId, float $amount, string $description, string $currency = 'USD', ?string $preferredMethod = null, array $metadata = [], ?string $successUrl = null, ?string $cancelUrl = null)
+ * @method static array getInvoiceStatus(string $invoiceId)
+ * @method static array syncPlans(array $plans)
  * 
  * @see \AcapaPay\Laravel\AcapaPayManager
  */

@@ -62,4 +62,24 @@ return [
     | representa os planos. Utilizado pelo comando acapapay:sync-plans.
     */
     'plan_model' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Moeda Preferida (RedotPay / Pagamentos Internacionais)
+    |--------------------------------------------------------------------------
+    | Se definida, será usada como moeda padrão nos checkouts.
+    | Útil para apps que cobram exclusivamente em USD (ex: via RedotPay/cripto).
+    | Valores suportados: 'AOA', 'USD'. Deixar null para usar a moeda do plano.
+    */
+    'preferred_currency' => env('ACAPAPAY_PREFERRED_CURRENCY', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Método de Pagamento Preferido
+    |--------------------------------------------------------------------------
+    | Se definido, será sugerido como método padrão na página de checkout.
+    | Valores suportados: 'REF' (Multicaixa), 'GPO' (Multicaixa Express),
+    | 'EKZ' (E-Kwanza), 'RDP' (RedotPay/Cripto). Deixar null para mostrar todos.
+    */
+    'preferred_method' => env('ACAPAPAY_PREFERRED_METHOD', null),
 ];
