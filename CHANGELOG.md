@@ -52,6 +52,12 @@ excepções novas continuam a ser apanhadas por `catch (\Exception $e)`.
   `NotFoundException`, `ForbiddenException` e `ConnectionException`.
 - `ChargeResult` — objecto de resultado com `payUrl()`, `reference()`,
   `expiresAt()`, `isMock()`… e que também funciona como array.
+- `ChargeResult::paymentMethods()`, `qrCodeUrls()` e `appUrl(string $walletId)`
+  — para quem quer construir o próprio ecrã de pagamento em cripto com o QR
+  code embutido, em vez de redirecionar para a página da RedotPay. Ver a
+  secção "Como apresentar o pagamento ao utilizador: 2 fluxos possíveis" no
+  README para a explicação completa (incluindo o porquê de teres de gerar tu
+  a imagem do QR a partir do link que a RedotPay devolve).
 - Timeouts, retentativas e TTL do token configuráveis
   (`ACAPAPAY_TIMEOUT`, `ACAPAPAY_CONNECT_TIMEOUT`, `ACAPAPAY_RETRY_TIMES`,
   `ACAPAPAY_TOKEN_TTL`).

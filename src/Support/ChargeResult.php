@@ -93,6 +93,94 @@ final class ChargeResult implements \ArrayAccess, \JsonSerializable
     }
 
     /**
+     * As carteiras de criptomoeda suportadas pela RedotPay para esta cobrança
+     * (Phantom, Rainbow, TronLink, etc.), tal como a RedotPay as devolveu —
+     * cada uma com o seu nome, logótipo e os links de pagamento/QR.
+     *
+     * Só faz sentido chamar isto num ChargeResult de um método RDP
+     * (RedotPay). Nos outros métodos (REF, GPO, EKZ) devolve um array vazio.
+     *
+     * Cada item tem, tipicamente, esta forma (nem todos os campos vêm sempre
+     * preenchidos — depende da carteira):
+     * [
+     *     'id'       => 'phantom',
+     *     'name'     => 'Phantom',
+     *     'logo'     => 'https://.../phantom.svg',
+     *     'webUrl'   => 'https://phantom.app/ul/browse/...',   // abrir num browser desktop
+     *     'webQrCode'=> 'https://phantom.app/ul/browse/...',   // converter em QR (desktop)
+     *     'h5Url'    => 'https://phantom.app/ul/browse/...',   // abrir num browser mobile
+     *     'h5QrCode' => 'https://phantom.app/ul/browse/...',   // converter em QR (mobile/H5)
+     *     'appUrl'   => 'https://phantom.app/ul/browse/...',   // deep-link direto para a app
+     *     'appQrCode'=> null,
+     * ]
+     *
+     * @return array<int, array<string, mixed>>
+     *
+     * @since 1.2.0
+     */
+    public function paymentMethods(): array
+    {
+        return $this->payload['data']['paymentMethods'] ?? [];
+    }
+
+    /**
+     * Atalho sobre paymentMethods(): só os links a converter em QR code,
+     * indexados pelo id da carteira (ex: 'phantom', 'rainbow', 'tronlink').
+     *
+     * ⚠️ IMPORTANTE: estes valores são LINKS (deep-links), não imagens de QR
+     * code prontas. A RedotPay não gera a imagem — quem gera é a tua
+     * aplicação, a partir destes links. Ver a secção "Renderizar o QR code"
+     * no README para os pacotes recomendados (PHP e JavaScript).
+     *
+     * Usa 'web' quando o utilizador está num ecrã de desktop (vai ver o QR e
+     * digitalizá-lo com o telemóvel) e 'h5' quando está a navegar já a partir
+     * do telemóvel (nesse caso normalmente nem mostras QR — usas antes um
+     * botão que abre o link directamente, ver appUrl() abaixo).
+     *
+     * @return array<string, array{name: ?string, logo: ?string, web: ?string, h5: ?string}>
+     *
+     * @since 1.2.0
+     */
+    public function qrCodeUrls(): array
+    {
+        $urls = [];
+
+        foreach ($this->paymentMethods() as $method) {
+            $id = $method['id'] ?? null;
+
+            if (!$id) {
+                continue;
+            }
+
+            $urls[$id] = [
+                'name' => $method['name'] ?? null,
+                'logo' => $method['logo'] ?? null,
+                'web' => $method['webQrCode'] ?? null,
+                'h5' => $method['h5QrCode'] ?? null,
+            ];
+        }
+
+        return $urls;
+    }
+
+    /**
+     * O deep-link para abrir directamente a carteira $walletId (ex: 'phantom'),
+     * a usar num botão "Abrir na app" quando o utilizador já está no telemóvel.
+     *
+     * @since 1.2.0
+     */
+    public function appUrl(string $walletId): ?string
+    {
+        foreach ($this->paymentMethods() as $method) {
+            if (($method['id'] ?? null) === $walletId) {
+                return $method['appUrl'] ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Payload bruto devolvido pelo gateway.
      *
      * @return array<string, mixed>

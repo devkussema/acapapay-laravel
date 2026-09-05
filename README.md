@@ -301,7 +301,165 @@ createInvoice()  →  charge()  →  status()  (polling)
                           webhook invoice.paid (confirmação fiável)
 ```
 
-### Exemplo completo: checkout em cripto próprio
+### Como apresentar o pagamento ao utilizador: 2 fluxos possíveis
+
+Isto aplica-se especificamente ao método `RDP` (RedotPay/criptomoeda), que é o único
+onde a diferença entre os dois fluxos é significativa (para REF/GPO/EKZ a API direta
+já te dá a referência/ticket em texto, pronta a mostrar — não há QR nem redirecionamento
+externo envolvido).
+
+Quando geras uma cobrança RDP, tens de escolher **uma de duas formas** de levar o
+utilizador a pagar. Nenhuma delas é "melhor" objetivamente — a escolha depende de
+quanto controlo visual precisas e de quanto trabalho estás disposto a fazer.
+
+#### Fluxo 1 — Redirecionar (ou abrir num separador novo). Recomendado por omissão.
+
+É o mais simples e é o que a nossa própria página de checkout hospedado usa
+internamente. Chamas `charge()`, recebes um `payUrl()`, e envias o utilizador
+para lá — ponto final.
+
+```php
+$charge = AcapaPay::direct()->charge($invoiceId, PaymentMethod::RDP);
+
+return redirect($charge->payUrl());
+// ou, se estiveres a chamar isto via AJAX/fetch a partir do frontend:
+// return response()->json(['pay_url' => $charge->payUrl()]);
+// e no frontend: window.open(data.pay_url, '_blank');
+```
+
+O que o utilizador vê ao chegar a esse `payUrl()`: uma página **hospedada pela
+RedotPay** (não é nossa, nem tua) com a lista de carteiras suportadas
+(MetaMask, Phantom, Trust Wallet, Coinbase, TronLink, etc.), cada uma já com o
+seu próprio QR code desenhado e pronto a digitalizar. A RedotPay trata de tudo:
+gerar as imagens de QR, detetar se o visitante está em mobile ou desktop, abrir
+o deep-link correto se tiver a carteira instalada no telemóvel, etc.
+
+**Vantagens:**
+- Zero código extra do lado da UI — só precisas do link.
+- A RedotPay mantém aquela página atualizada (novas carteiras, correções de
+  segurança, etc.) sem tu teres de mexer em nada.
+- Funciona logo em mobile e desktop, sem teres de te preocupar com qual QR
+  mostrar em cada caso.
+
+**Desvantagem:**
+- O utilizador sai da tua aplicação/domínio durante um instante (vê o URL da
+  RedotPay na barra de endereços, ou vês o iframe/separador novo). Se a tua
+  marca for muito importante nesse momento, isto pode incomodar.
+
+#### Fluxo 2 — Construir a tua própria interface com o QR code embutido. Mais trabalho, mais controlo.
+
+Se quiseres que o utilizador **nunca saia da tua página** — por exemplo, mostrar
+o QR code dentro de um modal da tua app, ao lado do logótipo da tua marca — usa
+`paymentMethods()` ou `qrCodeUrls()` no `ChargeResult` devolvido por `charge()`.
+
+**⚠️ Ponto mais importante de todo este fluxo, lê com atenção:** os campos `webQrCode`
+e `h5QrCode` que a RedotPay devolve **não são imagens**. São *links* (deep-links de
+carteira, tipo `https://phantom.app/ul/browse/...`). A RedotPay não gera nenhuma
+imagem de QR code para te dar — quem tem de gerar a imagem, a partir desse link
+de texto, **é a tua aplicação**. Isto é o "trabalho extra" de que falávamos: sem
+esse passo de geração da imagem, não tens QR code nenhum para mostrar, só um link.
+
+```php
+use AcapaPay\Laravel\Facades\AcapaPay;
+use AcapaPay\Laravel\Enums\PaymentMethod;
+
+$charge = AcapaPay::direct()->charge($invoiceId, PaymentMethod::RDP);
+
+// Todas as carteiras suportadas, com nome, logótipo e os links a converter em QR:
+$wallets = $charge->qrCodeUrls();
+/*
+[
+    'phantom'  => ['name' => 'Phantom',  'logo' => 'https://.../phantom.svg',  'web' => 'https://phantom.app/ul/browse/...', 'h5' => '...'],
+    'metamask' => ['name' => 'MetaMask', 'logo' => 'https://.../metamask.svg', 'web' => 'https://metamask.app.link/...',     'h5' => '...'],
+    'trust'    => [...],
+    'tronlink' => [...],
+    // ... normalmente 12-13 carteiras
+]
+*/
+
+return view('checkout.cripto', [
+    'wallets'   => $wallets,
+    'invoiceId' => $invoiceId,
+]);
+```
+
+Agora, na tua view, tens de gerar a imagem do QR code **a partir do link** (o
+campo `'web'` de cada carteira). Há duas formas de o fazer — escolhe consoante
+onde preferes que o trabalho aconteça:
+
+**Opção A — Gerar a imagem no servidor (PHP), com [`simplesoftwareio/simple-qrcode`](https://github.com/SimpleSoftwareIO/simple-qrcode):**
+
+```bash
+composer require simplesoftwareio/simple-qrcode
+```
+
+```blade
+{{-- resources/views/checkout/cripto.blade.php --}}
+@foreach ($wallets as $id => $wallet)
+    @if ($wallet['web'])
+        <div class="carteira">
+            <img src="{{ $wallet['logo'] }}" alt="{{ $wallet['name'] }}">
+            <p>{{ $wallet['name'] }}</p>
+            {{-- SimpleQrCode desenha o SVG do QR diretamente a partir do link --}}
+            {!! QrCode::size(220)->generate($wallet['web']) !!}
+        </div>
+    @endif
+@endforeach
+```
+
+**Opção B — Gerar a imagem no browser (JavaScript), com uma lib tipo
+[`qrcode`](https://www.npmjs.com/package/qrcode) (evita uma dependência PHP extra,
+útil se o teu checkout for uma SPA/Vue/React):**
+
+```html
+<canvas id="qr-phantom"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script>
+    // 'linkDaCarteira' é o valor de $wallet['web'] que já devolveste do backend
+    // (por exemplo dentro de um @json($wallets) embutido na página).
+    QRCode.toCanvas(document.getElementById('qr-phantom'), linkDaCarteira);
+</script>
+```
+
+Em qualquer das opções, se detetares que o visitante está num **telemóvel**
+(user agent, ou uma media query no frontend), o mais correto é usares
+`h5` em vez de `web`, ou até nem mostrares QR nenhum e usares antes um botão
+"Abrir carteira" apontado a `appUrl()` — porque num telemóvel não faz sentido
+pedir ao utilizador para digitalizar um QR code com... o próprio telemóvel:
+
+```php
+$phantomAppLink = $charge->appUrl('phantom'); // deep-link direto, sem QR
+```
+
+```blade
+<a href="{{ $phantomAppLink }}" class="btn">Abrir no Phantom</a>
+```
+
+**Vantagens:**
+- Zero saída da tua aplicação — o pagamento acontece dentro da tua própria página.
+- Controlo total do design (podes escolher quais carteiras mostrar, a ordem, o estilo).
+
+**Desvantagens (o "trabalho extra"):**
+- Tens de escolher e integrar uma biblioteca de geração de QR code (uma das
+  duas acima, ou outra à tua escolha) — a RedotPay e o SDK não geram a imagem
+  por ti, só o link.
+- Tens de decidir tu, caso a caso, se mostras `web` (QR) ou `h5`/`appUrl()`
+  (deep-link direto) consoante o dispositivo do visitante.
+- Sempre que a RedotPay acrescentar/retirar carteiras suportadas, o array de
+  `paymentMethods()` muda — a tua UI tem de lidar bem com isso (não assumas
+  sempre as mesmas 13 carteiras).
+
+#### Qual escolher?
+
+| | Fluxo 1 (redirecionar) | Fluxo 2 (QR embutido) |
+|---|---|---|
+| Trabalho de implementação | Nenhum além de `charge()->payUrl()` | Escolher/integrar uma lib de QR, decidir web vs h5 por dispositivo |
+| Onde o utilizador vê o QR | Página da RedotPay (fora da tua app) | Dentro da tua própria página |
+| Manutenção ao longo do tempo | Nenhuma (a RedotPay atualiza a página dela) | Tens de acompanhar mudanças no array `paymentMethods()` |
+| Recomendado para | A maioria das apps — arranca em minutos | Apps onde a experiência de marca dentro do checkout é crítica |
+
+### Exemplo completo: checkout em cripto próprio (Fluxo 1 — redirecionar)
 
 ```php
 use AcapaPay\Laravel\Facades\AcapaPay;
@@ -377,7 +535,21 @@ AcapaPay::direct()->simulate($invoiceId);
 | `AcapaPay::direct()->simulate($invoiceId)` | Marca como paga (só em sandbox). |
 | `AcapaPay::createCryptoCharge(array $attributes)` | Cria fatura em USD + cobrança cripto, num só passo. |
 
-O `ChargeResult` devolvido por `charge()` expõe `payUrl()`, `reference()`, `entity()`, `expiresAt()`, `paymentMethod()`, `isMock()` e `data()` — e também funciona como array (`$charge['data']['pay_url']`).
+O `ChargeResult` devolvido por `charge()` expõe:
+
+| Método | Devolve | Usa em |
+|---|---|---|
+| `payUrl()` | Link da página de checkout da RedotPay | Fluxo 1 (redirecionar) |
+| `paymentMethods()` | Array completo das carteiras suportadas (nome, logótipo, links) | Fluxo 2 (QR próprio) — dados em bruto |
+| `qrCodeUrls()` | Igual, mas simplificado: `[id => ['name','logo','web','h5']]` | Fluxo 2 (QR próprio) — atalho |
+| `appUrl(string $walletId)` | Deep-link direto de uma carteira específica | Fluxo 2, quando o visitante já está no telemóvel |
+| `reference()` / `entity()` | Referência/entidade Multicaixa | Método `REF` |
+| `expiresAt()` | Validade da cobrança (ISO 8601) | Todos os métodos |
+| `paymentMethod()` | O método usado (`'RDP'`, `'REF'`...) | Todos os métodos |
+| `isMock()` | Se foi uma simulação de sandbox | Todos os métodos |
+| `data()` | Payload bruto devolvido pelo gateway | Depuração / casos avançados |
+
+Também funciona como array simples (`$charge['data']['pay_url']`), se preferires não usar os métodos.
 
 ---
 
