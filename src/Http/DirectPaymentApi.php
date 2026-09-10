@@ -41,8 +41,13 @@ class DirectPaymentApi
      *     @type array  $items          Obrigatório: [['description','quantity','unit_price'], ...]
      *     @type string $app_reference  A tua referência interna do pedido.
      *     @type string $due_date       Opcional.
+     *     @type string $success_url    Para onde devolver o cliente depois de pagar. Em RDP é
+     *                                  este o URL que a RedotPay usa como redirectUrl.
+     *     @type string $cancel_url     Para onde devolver o cliente se ele desistir.
+     *     @type array  $metadata       Guardado na fatura e devolvido no webhook invoice.paid.
+     *     @type string $preferred_payment_method  REF|GPO|EKZ|RDP — sugestão para o checkout.
      * }
-     * @return array<string, mixed> {status, invoice_id, pay_url, total, currency}
+     * @return array<string, mixed> {status, invoice_id, pay_url, total, currency, preferred_payment_method}
      *
      * @throws ValidationException
      */
@@ -73,11 +78,26 @@ class DirectPaymentApi
             }
         }
 
-        if (isset($attributes['currency']) && !Currency::isValid((string) $attributes['currency'])) {
-            throw new ValidationException(
-                'AcapaPay SDK: moeda inválida. Use Currency::AOA ou Currency::USD.',
-                ['currency' => ['inválida']]
-            );
+        if (isset($attributes['currency'])) {
+            if (!Currency::isValid((string) $attributes['currency'])) {
+                throw new ValidationException(
+                    'AcapaPay SDK: moeda inválida. Use Currency::AOA ou Currency::USD.',
+                    ['currency' => ['inválida']]
+                );
+            }
+
+            // O servidor também normaliza, mas fazê-lo aqui evita que 'usd' viaje até lá.
+            $attributes['currency'] = strtoupper((string) $attributes['currency']);
+        }
+
+        // Em sandbox, marcar a fatura como tal — é isto que faz o servidor usar o gateway
+        // simulado em vez de gerar cobranças a sério. checkoutSession() e o createInvoice()
+        // do AcapaPayManager já o faziam; aqui faltava, pelo que quem construía o seu próprio
+        // checkout com direct()->createInvoice() gerava cobranças reais mesmo em sandbox.
+        if (config('acapapay.modo') === 'sandbox') {
+            $metadata = $attributes['metadata'] ?? [];
+            $metadata['sandbox_mode'] = true;
+            $attributes['metadata'] = $metadata;
         }
 
         return $this->client->post('/v1/billing/invoices', $attributes);

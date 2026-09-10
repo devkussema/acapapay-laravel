@@ -9,6 +9,31 @@ O AcapaPay suporta pagamentos em **Dólar Americano (USD)** e **criptomoeda (sta
 - O método correspondente é `PaymentMethod::RDP` (constante de `AcapaPay\Laravel\Enums\PaymentMethod`).
 - **A RedotPay exige faturas em USD.** Se criares uma fatura em `AOA` e pedires `RDP`, a API devolve `422` com uma mensagem explícita — cria sempre a fatura com `currency: Currency::USD`.
 - A validade de uma cobrança RDP é de **1 hora** a partir da criação.
+- **Limite de valor por fatura.** O contrato da RedotPay limita cada linha de produto a
+  menos de 10 000 (`0 < goodsAmount < 10000`) e a ordem a 10 linhas. O AcapaPay reparte o
+  total da tua fatura pelas linhas necessárias automaticamente, mas isso impõe um tecto de
+  **99 999,90 USD por fatura**. Acima disso a cobrança falha com uma mensagem explícita —
+  divide o valor por várias faturas.
+- **Para onde volta o cliente depois de pagar:** o `success_url` que envias ao criar a
+  fatura é o `redirectUrl` que a RedotPay usa. Se não o enviares, o cliente fica na página
+  de pagamento do AcapaPay em vez de voltar à tua app.
+
+> [!IMPORTANT]
+> **O webhook da RedotPay configura-se no painel deles, não por código.** O pedido de
+> criação de ordem da RedotPay não tem campo nenhum para URL de callback — só
+> `redirectUrl`. O endereço para onde a RedotPay envia a confirmação do pagamento é
+> definido em `business.redotpay.com`, na conta do comerciante. Isto é do lado do AcapaPay
+> (não teu): o `invoice.paid` que a **tua** app recebe continua a ser configurado
+> normalmente no painel Developer, e chega na mesma por reconciliação mesmo que o callback
+> da RedotPay falhe.
+
+### Em sandbox (`ACAPAPAY_MODO=sandbox`)
+
+Ao contrário de REF/GPO/EKZ, o RDP **não** é simulado quando a RedotPay está configurada
+do lado do AcapaPay: recebes um link de pagamento genuíno do ambiente de sandbox da
+RedotPay, onde podes pagar com carteiras de teste. Só se a RedotPay não estiver configurada
+é que recebes um mock (`is_mock: true`). Em qualquer dos casos, `direct()->simulate()`
+continua a liquidar a fatura e a disparar o `invoice.paid`.
 
 ## Checkout com USD/Cripto (via checkout hospedado)
 

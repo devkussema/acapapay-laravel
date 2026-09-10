@@ -7,6 +7,54 @@ e o versionamento segue o [SemVer](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.3.0] — 2026-09-11
+
+Correcções ao caminho **USD/criptomoeda (RedotPay)** para apps satélite, encontradas ao
+confrontar a implementação com o contrato oficial da RedotPay. **Não quebra nada**: as
+assinaturas públicas mantêm-se, e quem já cobra em AOA não precisa de mudar uma linha.
+
+> Boa parte destas correcções é no servidor AcapaPay (`id.acapadev`). Este pacote passa a
+> depender delas — actualiza o pacote **e** confirma que o SSO já está na versão que as traz.
+
+### Corrigido
+
+- **`direct()->createInvoice()` gerava cobranças reais em sandbox.** Ao contrário de
+  `checkoutSession()` e de `AcapaPay::createInvoice()`, não marcava a fatura com
+  `metadata.sandbox_mode`, que é o que faz o servidor usar o gateway simulado. Quem
+  construía o seu próprio checkout com a API direta estava a cobrar a sério em modo de teste.
+- **`success_url` e `cancel_url` eram descartados em faturas avulsas.** O servidor não os
+  aceitava no `POST /v1/billing/invoices`, pelo que o cliente que pagava em cripto era
+  devolvido à página do AcapaPay em vez de voltar à app satélite.
+- **Moeda em minúsculas.** `'usd'` passava pela validação e era gravado tal e qual, para
+  depois ser rejeitado pela RedotPay como `orderCurrency` — já com a fatura criada. Agora é
+  normalizado no SDK e no servidor.
+- **Moedas não suportadas eram aceites.** A validação do servidor era `size:3`, pelo que
+  `EUR` criava uma fatura que nenhum gateway consegue liquidar. Agora é `AOA` ou `USD`.
+- **Faturas acima de 10 000 USD eram enviadas truncadas à RedotPay.** O limite por linha de
+  produto do contrato oficial é `0 < goodsAmount < 10000` (e não 99 999,99): o total é agora
+  repartido por linhas, e uma fatura acima do tecto de 10 linhas falha com mensagem clara em
+  vez de criar uma ordem com valor errado. Ver [04-pagamentos-cripto-redotpay.md](docs/04-pagamentos-cripto-redotpay.md).
+- **Pagamentos ficavam pendentes para sempre depois de trocar de método.** Se o cliente
+  gerava uma referência Multicaixa e só depois escolhia cripto, o polling continuava a
+  consultar a primeira tentativa e a fatura nunca era dada como paga.
+- **A liquidação rebentava com erro de SQL** quando a fatura tinha mais do que uma cobrança
+  pendente (estado `cancelled` inexistente no esquema).
+
+### Alterado
+
+- `Currency::isValid()` continua igual, mas o SDK passa a **normalizar** a moeda para
+  maiúsculas e a lançar `ValidationException` antes do pedido, em vez de deixar o servidor
+  falhar mais tarde.
+- `POST /v1/billing/invoices` passa a devolver também `preferred_payment_method`.
+
+### Documentação
+
+- [04-pagamentos-cripto-redotpay.md](docs/04-pagamentos-cripto-redotpay.md): tecto de valor
+  por fatura, comportamento em sandbox, e o facto de o webhook da RedotPay se configurar no
+  painel do comerciante (o pedido de criação de ordem não tem campo de callback).
+
+---
+
 ## [1.2.0] — 2026-09-04
 
 Suporte completo a pagamentos em **USD e criptomoedas (RedotPay)** e uma nova

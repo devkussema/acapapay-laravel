@@ -123,10 +123,10 @@ class AcapaPayManager
         ];
 
         // Adicionar moeda preferida (ex: 'USD' para pagamentos cripto/RedotPay)
+        $currency = $currency ?: config('acapapay.preferred_currency');
+
         if ($currency) {
-            $body['currency'] = $currency;
-        } elseif (config('acapapay.preferred_currency')) {
-            $body['currency'] = config('acapapay.preferred_currency');
+            $body['currency'] = $this->normalizeCurrency($currency);
         }
 
         // Adicionar método de pagamento preferido (ex: 'RDP' para RedotPay)
@@ -178,7 +178,7 @@ class AcapaPayManager
         // simples, que é a que faz sentido para um pagamento avulso.
         $body = [
             'customer_name' => $metadata['customer_name'] ?? ('user:' . $userId),
-            'currency'      => $currency,
+            'currency'      => $this->normalizeCurrency($currency),
             'items'         => [[
                 'description' => $description,
                 'quantity'    => 1,
@@ -204,6 +204,27 @@ class AcapaPayManager
         $result = $this->apiRequest('POST', '/v1/billing/invoices', $body);
 
         return $result['pay_url'] ?? $result['url'] ?? '';
+    }
+
+    /**
+     * Normaliza e valida a moeda antes de a enviar ao servidor.
+     *
+     * Uma moeda em minúsculas ('usd') passava a validação do servidor antiga e ia ser
+     * gravada tal e qual na fatura, para depois ser rejeitada pela RedotPay como
+     * orderCurrency — já com a fatura criada e o utilizador à espera.
+     *
+     * @throws \AcapaPay\Laravel\Exceptions\ValidationException
+     */
+    protected function normalizeCurrency(string $currency): string
+    {
+        if (!\AcapaPay\Laravel\Enums\Currency::isValid($currency)) {
+            throw new \AcapaPay\Laravel\Exceptions\ValidationException(
+                'AcapaPay SDK: moeda inválida "' . $currency . '". Use Currency::AOA ou Currency::USD.',
+                ['currency' => ['inválida']]
+            );
+        }
+
+        return strtoupper($currency);
     }
 
     /**
