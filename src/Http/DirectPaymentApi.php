@@ -13,8 +13,8 @@ use AcapaPay\Laravel\Support\ChargeResult;
  *
  * Permite à tua app construir o seu próprio ecrã de checkout — mostrando a
  * referência Multicaixa, o prompt do Multicaixa Express, o ticket E-Kwanza ou
- * o link de pagamento em cripto da RedotPay dentro da tua própria interface —
- * sem redirecionar o utilizador nem embutir o iFrame do AcapaPay.
+ * o link de pagamento hospedado da RedotPay/WiPay dentro da tua própria
+ * interface — sem redirecionar o utilizador nem embutir o iFrame do AcapaPay.
  *
  * Fluxo típico:
  *   1. createInvoice()  → cria a fatura
@@ -45,7 +45,7 @@ class DirectPaymentApi
      *                                  este o URL que a RedotPay usa como redirectUrl.
      *     @type string $cancel_url     Para onde devolver o cliente se ele desistir.
      *     @type array  $metadata       Guardado na fatura e devolvido no webhook invoice.paid.
-     *     @type string $preferred_payment_method  REF|GPO|EKZ|RDP — sugestão para o checkout.
+     *     @type string $preferred_payment_method  REF|GPO|EKZ|RDP|WIP — sugestão para o checkout.
      * }
      * @return array<string, mixed> {status, invoice_id, pay_url, total, currency, preferred_payment_method}
      *
@@ -107,8 +107,9 @@ class DirectPaymentApi
      * Gera uma cobrança para uma fatura já criada.
      *
      * @param string      $invoiceId     ID devolvido por createInvoice()
-     * @param string      $paymentMethod PaymentMethod::REF|GPO|EKZ|RDP
-     * @param string|null $phoneNumber   Obrigatório para GPO e EKZ
+     * @param string      $paymentMethod PaymentMethod::REF|GPO|EKZ|RDP|WIP
+     * @param string|null $phoneNumber   Obrigatório para GPO e EKZ. Opcional em WIP
+     *                                   (a WiPay aceita telefone ou outra identificação).
      *
      * @throws ValidationException
      */
@@ -150,6 +151,19 @@ class DirectPaymentApi
     public function chargeWithCrypto(string $invoiceId): ChargeResult
     {
         return $this->charge($invoiceId, PaymentMethod::RDP);
+    }
+
+    /**
+     * Atalho para uma cobrança via WiPay (checkout hospedado, AOA).
+     *
+     * @param string|null $phoneNumber Opcional — a WiPay aceita telefone ou
+     *                                 outra identificação do cliente.
+     *
+     * @since 1.4.0
+     */
+    public function chargeWithWipay(string $invoiceId, ?string $phoneNumber = null): ChargeResult
+    {
+        return $this->charge($invoiceId, PaymentMethod::WIP, $phoneNumber);
     }
 
     /**

@@ -27,13 +27,21 @@ final class PaymentMethod
     public const RDP = 'RDP';
 
     /**
+     * WiPay — checkout hospedado (Angola, AOA). Sem QR code e sem endpoint de
+     * consulta de estado: só o webhook `invoice.paid` confirma o pagamento.
+     *
+     * @since 1.4.0
+     */
+    public const WIP = 'WIP';
+
+    /**
      * Todos os métodos suportados.
      *
      * @return array<int, string>
      */
     public static function all(): array
     {
-        return [self::REF, self::GPO, self::EKZ, self::RDP];
+        return [self::REF, self::GPO, self::EKZ, self::RDP, self::WIP];
     }
 
     public static function isValid(string $method): bool
@@ -67,6 +75,7 @@ final class PaymentMethod
             self::GPO => 'Multicaixa Express',
             self::EKZ => 'E-Kwanza',
             self::RDP => 'Criptomoeda (RedotPay)',
+            self::WIP => 'WiPay',
             default => $method,
         };
     }

@@ -1,6 +1,6 @@
 # AcapaPay Laravel SDK
 
-O **AcapaPay Laravel SDK** é a biblioteca oficial para integrar de forma rápida e segura a gateway de pagamentos centralizada do ecossistema AcapaDev em qualquer projeto baseado no Laravel — Multicaixa (Referência e Express), E-Kwanza, e pagamentos em USD/criptomoeda via RedotPay.
+O **AcapaPay Laravel SDK** é a biblioteca oficial para integrar de forma rápida e segura a gateway de pagamentos centralizada do ecossistema AcapaDev em qualquer projeto baseado no Laravel — Multicaixa (Referência e Express), E-Kwanza, pagamentos em USD/criptomoeda via RedotPay, e (desde a v1.4.0) **WiPay**, um novo checkout hospedado em AOA.
 
 > [!WARNING]
 > **Compatibilidade exclusiva:** este pacote foi desenhado exclusivamente para o **Laravel Framework**. Tem uma proteção em runtime que impede a sua execução em ambientes PHP puro ou noutras frameworks.
@@ -65,6 +65,17 @@ Isto é só o essencial para arrancar — para tudo o resto (config completa, iF
 | 9 | [Referência Rápida](docs/09-referencia-rapida.md) | Todas as tabelas (métodos, eventos, exceções, config) num só sítio. |
 
 > Estes ficheiros são a **única fonte de documentação mantida** deste pacote (substituem o antigo `docs.html`, que ficou desatualizado e foi removido). Se encontrares alguma divergência entre esta documentação e o código, por favor abre uma *issue*.
+
+## 📚 Documentação v2 (recomendado — WiPay + RedotPay)
+
+Desde a v1.4.0, se a tua app só usa os métodos hospedados mais recentes — **WiPay (WIP)** e **RedotPay (RDP)** —, esta documentação alternativa é mais direta (não passa por REF/GPO/EKZ). A documentação v1 acima continua válida e não foi alterada.
+
+| # | Ficheiro | Conteúdo |
+|---|---|---|
+| 1 | [Checkout Hospedado](docs/v2/01-checkout-hospedado.md) | `checkoutSession()`, `createInvoice()`, iFrame — para WiPay e RedotPay. |
+| 2 | [API de Pagamento Direta](docs/v2/02-pagamento-direto-api.md) | `AcapaPay::direct()`, `chargeWithWipay()`, `chargeWithCrypto()`, `ChargeResult`. |
+| 3 | [Webhooks e Eventos](docs/v2/03-webhooks-e-eventos.md) | Por que o webhook é **obrigatório** para WiPay (sem endpoint de consulta de estado). |
+| 4 | [Referência Rápida](docs/v2/04-referencia-rapida.md) | Tabela comparativa WIP vs. RDP e resumo de tudo. |
 
 ## Changelog
 

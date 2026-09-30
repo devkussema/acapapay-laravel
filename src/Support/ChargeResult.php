@@ -41,8 +41,9 @@ final class ChargeResult implements \ArrayAccess, \JsonSerializable
     }
 
     /**
-     * URL de pagamento — no caso da RedotPay, a página de checkout em cripto
-     * para onde deves enviar o utilizador.
+     * URL de pagamento — no caso da RedotPay, a página de checkout em cripto,
+     * e no caso da WiPay, o checkout hospedado da WiPay — para onde deves
+     * enviar o utilizador (ou embutir num iFrame).
      */
     public function payUrl(): ?string
     {
@@ -50,7 +51,7 @@ final class ChargeResult implements \ArrayAccess, \JsonSerializable
     }
 
     /**
-     * Método usado: 'REF', 'GPO', 'EKZ' ou 'RDP'.
+     * Método usado: 'REF', 'GPO', 'EKZ', 'RDP' ou 'WIP'.
      */
     public function paymentMethod(): ?string
     {

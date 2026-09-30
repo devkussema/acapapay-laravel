@@ -7,6 +7,36 @@ e o versionamento segue o [SemVer](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.4.0] — 2026-10-01
+
+Suporte ao **WIP (WiPay)**, o 5º método de pagamento do AcapaDev ID: um checkout
+hospedado em AOA, sem QR code e sem endpoint de consulta de estado — só o webhook
+`invoice.paid` confirma o pagamento. **Aditivo**: não remove nem altera o comportamento
+de REF/GPO/EKZ/RDP.
+
+### Adicionado
+
+- `PaymentMethod::WIP`, incluído em `all()` e `label()` (`'WiPay'`). `requiresPhoneNumber()`
+  e `requiresUsd()` devolvem `false` para WIP — o campo `customer` da WiPay aceita telefone
+  ou qualquer outra identificação, e a moeda é sempre AOA.
+- `DirectPaymentApi::chargeWithWipay(string $invoiceId, ?string $phoneNumber = null)` —
+  atalho para `charge($invoiceId, PaymentMethod::WIP, $phoneNumber)`, espelhando
+  `chargeWithCrypto()`.
+- `AcapaPayPaymentReceived::isWipay(): bool` — atalho `$event->paymentMethod === 'WIP'`,
+  espelhando `isCrypto()`.
+- `config/acapapay.php`: `preferred_method` passa a documentar `'WIP'` como valor válido.
+- **Documentação v2** (`docs/v2/`), focada só em WiPay (WIP) e RedotPay (RDP) — uma
+  alternativa mais direta à documentação v1 completa (que continua intacta, cobrindo todos
+  os métodos). Ver a nova secção no README.
+
+> [!IMPORTANT]
+> O **WIP não tem endpoint de consulta de estado** do lado do servidor. Quem integrar este
+> método não pode depender de `direct()->status()`/`isPaid()` como confirmação — só o
+> webhook `invoice.paid` é fiável. Ver
+> [docs/v2/03-webhooks-e-eventos.md](docs/v2/03-webhooks-e-eventos.md).
+
+---
+
 ## [1.3.0] — 2026-09-11
 
 Correcções ao caminho **USD/criptomoeda (RedotPay)** para apps satélite, encontradas ao

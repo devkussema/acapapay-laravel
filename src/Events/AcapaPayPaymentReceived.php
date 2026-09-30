@@ -46,8 +46,8 @@ class AcapaPayPaymentReceived
     public ?string $expiresAt;
 
     /**
-     * Método de pagamento usado: 'REF', 'GPO', 'EKZ' ou 'RDP' (RedotPay/cripto).
-     * Pode ser null se o servidor não o enviar.
+     * Método de pagamento usado: 'REF', 'GPO', 'EKZ', 'RDP' (RedotPay/cripto)
+     * ou 'WIP' (WiPay). Pode ser null se o servidor não o enviar.
      *
      * @see \AcapaPay\Laravel\Enums\PaymentMethod
      */
@@ -110,5 +110,15 @@ class AcapaPayPaymentReceived
     public function isCrypto(): bool
     {
         return $this->paymentMethod === 'RDP';
+    }
+
+    /**
+     * O pagamento foi feito através do checkout hospedado da WiPay?
+     *
+     * @since 1.4.0
+     */
+    public function isWipay(): bool
+    {
+        return $this->paymentMethod === 'WIP';
     }
 }

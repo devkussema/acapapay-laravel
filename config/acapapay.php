@@ -79,7 +79,8 @@ return [
     |--------------------------------------------------------------------------
     | Se definido, será sugerido como método padrão na página de checkout.
     | Valores suportados: 'REF' (Multicaixa), 'GPO' (Multicaixa Express),
-    | 'EKZ' (E-Kwanza), 'RDP' (RedotPay/Cripto). Deixar null para mostrar todos.
+    | 'EKZ' (E-Kwanza), 'RDP' (RedotPay/Cripto), 'WIP' (WiPay). Deixar null
+    | para mostrar todos.
     */
     'preferred_method' => env('ACAPAPAY_PREFERRED_METHOD', null),
 
