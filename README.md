@@ -1,20 +1,26 @@
 # AcapaPay Laravel SDK
 
-O **AcapaPay Laravel SDK** é a biblioteca oficial para integrar de forma rápida e segura a gateway de pagamentos centralizada do ecossistema AcapaDev em qualquer projeto baseado no Laravel — Multicaixa (Referência e Express), E-Kwanza, pagamentos em USD/criptomoeda via RedotPay, e (desde a v1.4.0) **WiPay**, um novo checkout hospedado em AOA.
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/devkussema/acapapay-laravel.svg?style=flat-square)](https://packagist.org/packages/devkussema/acapapay-laravel)
+[![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE.md)
+
+O **AcapaPay Laravel SDK** é a biblioteca oficial para integrar de forma rápida, robusta e segura a gateway de pagamentos centralizada do ecossistema **AcapaDev ID** em qualquer projeto baseado no Laravel.
+
+Suporta **Multicaixa Express (GPO)** e **Referência Multicaixa (REF)** via AppyPay / EMIS, pagamentos internacionais em USD e criptomoeda via **RedotPay (RDP)**, **WiPay (WIP)** e **Reembolsos Automatizados (Refunds)** com estorno direto no cartão do cliente.
 
 > [!WARNING]
-> **Compatibilidade exclusiva:** este pacote foi desenhado exclusivamente para o **Laravel Framework**. Tem uma proteção em runtime que impede a sua execução em ambientes PHP puro ou noutras frameworks.
+> **Compatibilidade exclusiva:** este pacote foi desenhado exclusivamente para o **Laravel Framework** (versões 9.x a 14.x) com PHP 8.1+. Tem uma proteção em runtime que impede a sua execução em ambientes PHP puro ou noutras frameworks.
 
 ## Funcionalidades principais
 
-- **Autenticação automática** — gestão transparente de tokens M2M (OAuth2 Client Credentials), com cache, retentativa automática em 401, e retentativa em falhas de rede.
-- **Checkout hospedado** — uma chamada (`checkoutSession()`) devolve um URL pronto a redirecionar ou a embutir num `<x-acapapay::iframe>`.
-- **API de pagamento direta** — constrói a tua própria interface de checkout (`AcapaPay::direct()`), sem redirecionar nem usar iFrame.
-- **Pagamentos em USD/criptomoeda (RedotPay)** — com duas formas de apresentar ao utilizador: redirecionar, ou o teu próprio QR code embutido.
-- **Webhooks validados por HMAC**, com eventos nativos do Laravel (`AcapaPayPaymentReceived`, `AcapaPayInvoicePaid`, `AcapaPayInvoiceFailed`, `AcapaPayInvoiceExpired`).
-- **Exceções tipadas** (`ValidationException`, `AuthenticationException`, etc.), todas compatíveis com `catch (\Exception $e)`.
-- **Modo Sandbox** para testar todo o fluxo sem gerar cobranças reais.
-- **CLI de diagnóstico** (`acapapay:test-connection`) e de sincronização de planos (`acapapay:sync-plans`).
+- **Autenticação automática** — gestão transparente de tokens M2M (OAuth2 Client Credentials), com cache, retentativa automática em 401 e retentativa em falhas de rede.
+- **Reembolsos Automatizados (Novo na v1.5.0)** — estornos totais ou parciais de cobranças (`AcapaPay::refund()`) com crédito imediato no cartão do cliente via Multicaixa Express.
+- **Checkout hospedado** — uma chamada (`AcapaPay::checkoutSession()`) devolve um URL pronto a redirecionar ou a embutir num `<x-acapapay::iframe>`.
+- **API de pagamento direta (Headless)** — constrói a tua própria interface de checkout (`AcapaPay::direct()`), sem redirecionar nem usar iFrame.
+- **Pagamentos em USD/criptomoeda (RedotPay)** — liquidação em USDT/USDC/BTC com interface pronta ou QR code nativo.
+- **Webhooks validados por HMAC-SHA256**, com eventos nativos do Laravel (`AcapaPayPaymentReceived`, `AcapaPayInvoicePaid`, `AcapaPayInvoiceRefunded`, `AcapaPayInvoiceFailed`, `AcapaPayInvoiceExpired`).
+- **Exceções tipadas** (`ValidationException`, `AuthenticationException`, `ForbiddenException`, etc.), todas compatíveis com `catch (\Exception $e)`.
+- **Modo Sandbox** para testar todo o ciclo de vida (cobrança, liquidação, estorno) sem dinheiro real.
+- **CLI de diagnóstico e sincronização** (`acapapay:test-connection` e `acapapay:sync-plans`).
 
 ## Instalação rápida
 
@@ -23,11 +29,11 @@ composer require devkussema/acapapay-laravel
 ```
 
 ```env
-ACAPAPAY_HOST=https://id.acapadev.com
-ACAPAPAY_API_HOST=https://api.acapadev.com
+ACAPAPAY_MODO=sandbox
 ACAPAPAY_CLIENT_ID=o-teu-client-id
 ACAPAPAY_CLIENT_SECRET=o-teu-client-secret
 ACAPAPAY_WEBHOOK_SECRET=o-teu-webhook-secret
+ACAPAPAY_BASE_URL=https://id.acapadev.me
 ```
 
 ```bash
@@ -38,48 +44,42 @@ php artisan acapapay:test-connection
 use AcapaPay\Laravel\Facades\AcapaPay;
 
 $url = AcapaPay::checkoutSession(
-    auth()->id(),
-    'PRO_MONTHLY',
-    [],
-    url('/pagamento/sucesso'),
-    url('/pagamento/cancelado')
+    userId: auth()->id(),
+    planReference: 'PRO_MONTHLY',
+    metadata: ['empresa_id' => 12],
+    successUrl: url('/pagamento/sucesso'),
+    cancelUrl: url('/pagamento/cancelado')
 );
 
-return redirect($url);
+return redirect()->away($url);
 ```
 
-Isto é só o essencial para arrancar — para tudo o resto (config completa, iFrame, API direta, cripto, webhooks, erros, sandbox, sync de planos), ver a documentação completa abaixo.
+---
 
-## 📚 Documentação Completa
+## 📚 Documentação Oficial (v1.5.0 — Novembro 2026)
 
-| # | Ficheiro | Conteúdo |
-|---|---|---|
-| 1 | [Instalação e Configuração](docs/01-instalacao-e-configuracao.md) | Requisitos, `.env`, todas as chaves de config, comando de diagnóstico. |
-| 2 | [Checkout Hospedado](docs/02-checkout-hospedado.md) | `checkoutSession()`, `createInvoice()`, componente `<x-acapapay::iframe>`. |
-| 3 | [API de Pagamento Direta](docs/03-pagamento-direto-api.md) | Construir o teu próprio checkout: `AcapaPay::direct()`, `ChargeResult`, polling. |
-| 4 | [Pagamentos em USD/Cripto (RedotPay)](docs/04-pagamentos-cripto-redotpay.md) | Os **2 fluxos** de apresentar o pagamento (redirecionar vs. QR próprio), geração de QR code, e o que o pacote **não** cobre (Payment Links do dashboard RedotPay). |
-| 5 | [Webhooks e Eventos](docs/05-webhooks-e-eventos.md) | Como o webhook funciona, todos os eventos disponíveis, exemplos de listener. |
-| 6 | [Tratamento de Erros](docs/06-tratamento-de-erros.md) | A hierarquia de exceções e como as apanhar. |
-| 7 | [Sandbox e Testes](docs/07-sandbox-e-testes.md) | Simular pagamentos sem gerar cobranças reais, webhooks locais com túnel. |
-| 8 | [Sincronização de Planos](docs/08-sincronizacao-de-planos.md) | `acapapay:sync-plans`, `toAcapaPayFormat()`. |
-| 9 | [Referência Rápida](docs/09-referencia-rapida.md) | Todas as tabelas (métodos, eventos, exceções, config) num só sítio. |
-
-> Estes ficheiros são a **única fonte de documentação mantida** deste pacote (substituem o antigo `docs.html`, que ficou desatualizado e foi removido). Se encontrares alguma divergência entre esta documentação e o código, por favor abre uma *issue*.
-
-## 📚 Documentação v2 (recomendado — WiPay + RedotPay)
-
-Desde a v1.4.0, se a tua app só usa os métodos hospedados mais recentes — **WiPay (WIP)** e **RedotPay (RDP)** —, esta documentação alternativa é mais direta (não passa por REF/GPO/EKZ). A documentação v1 acima continua válida e não foi alterada.
+A documentação completa, versionada e atualizada está organizada na pasta [`docs/v1.5.0/`](docs/v1.5.0/):
 
 | # | Ficheiro | Conteúdo |
 |---|---|---|
-| 1 | [Checkout Hospedado](docs/v2/01-checkout-hospedado.md) | `checkoutSession()`, `createInvoice()`, iFrame — para WiPay e RedotPay. |
-| 2 | [API de Pagamento Direta](docs/v2/02-pagamento-direto-api.md) | `AcapaPay::direct()`, `chargeWithWipay()`, `chargeWithCrypto()`, `ChargeResult`. |
-| 3 | [Webhooks e Eventos](docs/v2/03-webhooks-e-eventos.md) | Por que o webhook é **obrigatório** para WiPay (sem endpoint de consulta de estado). |
-| 4 | [Referência Rápida](docs/v2/04-referencia-rapida.md) | Tabela comparativa WIP vs. RDP e resumo de tudo. |
+| 01 | [Introdução e Arquitetura](docs/v1.5.0/01-introducao-e-arquitetura.md) | Visão geral do ecossistema, modos de integração e ciclo de vida. |
+| 02 | [Instalação e Configuração](docs/v1.5.0/02-instalacao-e-configuracao.md) | Requisitos, `.env`, publicação de config e teste de conectividade. |
+| 03 | [Checkout Hospedado](docs/v1.5.0/03-checkout-hospedado.md) | `checkoutSession()`, `createInvoice()`, componentes Blade e iFrame. |
+| 04 | [Pagamento Direto via API](docs/v1.5.0/04-pagamento-direto-api.md) | Checkout Headless: Multicaixa Express (GPO), Referência (REF), Cripto (RDP). |
+| 05 | [Reembolsos e Estornos (Novo)](docs/v1.5.0/05-reembolsos-e-estornos.md) | Estorno total e parcial via API (`AcapaPay::refund()`), regras e TPA Virtual. |
+| 06 | [Webhooks e Eventos](docs/v1.5.0/06-webhooks-e-eventos.md) | Assinatura HMAC, todos os eventos do SDK e Listeners práticos. |
+| 07 | [Sandbox e Testes](docs/v1.5.0/07-sandbox-testes-e-simulacao.md) | Simulações instantâneas (`simulate()`), estornos de teste e túneis locais. |
+| 08 | [Sincronização de Planos](docs/v1.5.0/08-sincronizacao-de-planos.md) | Gestão centralizada de planos no AcapaDev ID (`acapapay:sync-plans`). |
+| 09 | [Tratamento de Erros](docs/v1.5.0/09-tratamento-de-erros-e-resiliencia.md) | Hierarquia de exceções, resiliência e boas práticas. |
+| 10 | [Referência Rápida (Cheat Sheet)](docs/v1.5.0/10-referencia-rapida.md) | Resumo de métodos da Facade, API direta, Enums e payloads. |
+
+> Versões legadas de documentação encontram-se arquivadas em [`docs/v1.4.0/`](docs/v1.4.0/).
+
+---
 
 ## Changelog
 
-Ver [CHANGELOG.md](CHANGELOG.md) para o histórico de versões.
+Ver [CHANGELOG.md](CHANGELOG.md) para o histórico completo de versões.
 
 ## Licença
 

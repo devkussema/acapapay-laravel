@@ -79,4 +79,14 @@ final class PaymentMethod
             default => $method,
         };
     }
+
+    /**
+     * Indica se o método suporta estorno/reembolso programático direto via gateway.
+     *
+     * @since 1.5.0
+     */
+    public static function supportsRefund(string $method): bool
+    {
+        return $method === self::GPO;
+    }
 }

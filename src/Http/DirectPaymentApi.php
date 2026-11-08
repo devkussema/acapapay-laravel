@@ -221,4 +221,28 @@ class DirectPaymentApi
 
         return $this->client->post("/v1/billing/invoices/{$invoiceId}/simulate");
     }
+
+    /**
+     * Solicita o estorno/reembolso de uma fatura paga.
+     * Suportado para pagamentos via Multicaixa Express (GPO) e no ambiente Sandbox.
+     *
+     * @param string      $invoiceId ID da fatura no AcapaPay
+     * @param float|null  $amount    Montante a reembolsar (opcional, null = valor total)
+     * @param string|null $reason    Motivo do reembolso (opcional)
+     * @return array<string, mixed>
+     *
+     * @since 1.5.0
+     */
+    public function refund(string $invoiceId, ?float $amount = null, ?string $reason = null): array
+    {
+        $body = [];
+        if ($amount !== null) {
+            $body['amount'] = $amount;
+        }
+        if ($reason !== null) {
+            $body['reason'] = $reason;
+        }
+
+        return $this->client->post("/v1/billing/invoices/{$invoiceId}/refund", $body);
+    }
 }

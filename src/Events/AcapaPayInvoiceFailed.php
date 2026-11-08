@@ -8,7 +8,7 @@ use Illuminate\Queue\SerializesModels;
 
 /**
  * Evento disparado quando uma fatura do AcapaPay falha no pagamento.
- * Pode ocorrer quando a transação é rejeitada pela gateway (ex: RedotPay, Pay4All).
+ * Pode ocorrer quando a transação é rejeitada pela gateway (ex: AppyPay, RedotPay, WiPay).
  */
 class AcapaPayInvoiceFailed
 {

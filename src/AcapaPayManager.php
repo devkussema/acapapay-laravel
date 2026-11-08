@@ -287,4 +287,20 @@ class AcapaPayManager
 
         return $this->direct()->chargeWithCrypto((string) $invoice['invoice_id']);
     }
+
+    /**
+     * Solicita o estorno/reembolso de uma fatura paga.
+     * Atalho para direct()->refund($invoiceId, $amount, $reason).
+     *
+     * @param string      $invoiceId ID da fatura no AcapaPay
+     * @param float|null  $amount    Montante a reembolsar (opcional, null = valor total)
+     * @param string|null $reason    Motivo do reembolso (opcional)
+     * @return array<string, mixed>
+     *
+     * @since 1.5.0
+     */
+    public function refund(string $invoiceId, ?float $amount = null, ?string $reason = null): array
+    {
+        return $this->direct()->refund($invoiceId, $amount, $reason);
+    }
 }

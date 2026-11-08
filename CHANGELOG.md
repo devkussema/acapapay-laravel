@@ -7,7 +7,30 @@ e o versionamento segue o [SemVer](https://semver.org/lang/pt-BR/).
 
 ---
 
-## [1.4.0] — 2026-10-01
+## [1.5.0] — 2026-11-08
+
+Suporte oficial a **Reembolsos e Estornos Automatizados (Refunds)**, novo evento `AcapaPayInvoiceRefunded`, suporte aprimorado ao gateway **AppyPay v2.0**, e reorganização profissional da documentação por versões (`docs/v1.5.0/`).
+
+### Adicionado
+
+- **Suporte a Reembolsos Automatizados (Full e Partial Refunds):**
+  - `AcapaPay::refund(string $invoiceId, ?float $amount = null, ?string $reason = null): array`
+  - `DirectPaymentApi::refund(string $invoiceId, ?float $amount = null, ?string $reason = null): array`
+  - Suporte nativo a estornos em pagamentos via **Multicaixa Express (GPO)** e em modo **Sandbox**.
+  - `PaymentMethod::supportsRefund(string $method): bool` — método auxiliar para verificar elegibilidade de estorno programático.
+- **Novo Evento de Webhook e Classe de Evento Laravel:**
+  - `AcapaPay\Laravel\Events\AcapaPayInvoiceRefunded` — disparado automaticamente quando o webhook `invoice.refunded` é recebido e validado com sucesso por HMAC-SHA256.
+  - O controller de webhook (`WebhookController`) passa a mapear e despachar `invoice.refunded`.
+- **Documentação Versionada Profissional (`docs/v1.5.0/`):**
+  - Guia completo estruturado em 10 capítulos cobrindo Arquitetura, Instalação, Checkout Hospedado, Pagamento Direto Headless, Reembolsos, Webhooks, Sandbox, Catálogo de Planos, Tratamento de Erros e Referência Rápida (Cheat Sheet).
+  - Arquivamento da documentação anterior em `docs/v1.4.0/`.
+
+### Alterado
+
+- Atualização de PHPDoc annotations na Facade `AcapaPay` para incluir o método `refund()`.
+- Remoção e saneamento de menções a gateways descontinuados nos comentários de código.
+
+---
 
 Suporte ao **WIP (WiPay)**, o 5º método de pagamento do AcapaDev ID: um checkout
 hospedado em AOA, sem QR code e sem endpoint de consulta de estado — só o webhook

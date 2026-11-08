@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use AcapaPay\Laravel\Events\AcapaPayInvoicePaid;
 use AcapaPay\Laravel\Events\AcapaPayInvoiceFailed;
 use AcapaPay\Laravel\Events\AcapaPayInvoiceExpired;
+use AcapaPay\Laravel\Events\AcapaPayInvoiceRefunded;
 use AcapaPay\Laravel\Events\AcapaPayPaymentReceived;
 
 class WebhookController extends Controller
@@ -37,10 +38,11 @@ class WebhookController extends Controller
 
         try {
             match ($eventName) {
-                'invoice.paid'    => $this->handleInvoicePaid($data),
-                'invoice.failed'  => $this->handleInvoiceFailed($data),
-                'invoice.expired' => $this->handleInvoiceExpired($data),
-                default           => Log::info("AcapaPay SDK: Evento desconhecido ignorado: {$eventName}"),
+                'invoice.paid'     => $this->handleInvoicePaid($data),
+                'invoice.failed'   => $this->handleInvoiceFailed($data),
+                'invoice.expired'  => $this->handleInvoiceExpired($data),
+                'invoice.refunded' => $this->handleInvoiceRefunded($data),
+                default            => Log::info("AcapaPay SDK: Evento desconhecido ignorado: {$eventName}"),
             };
 
             return response()->json(['status' => 'success']);
@@ -118,5 +120,21 @@ class WebhookController extends Controller
         event(new AcapaPayInvoiceExpired($invoiceId, $metadata, $data));
 
         Log::info("AcapaPay SDK: Webhook invoice.expired validado e evento AcapaPayInvoiceExpired disparado.");
+    }
+
+    /**
+     * Processa o evento de fatura reembolsada/estornada.
+     */
+    private function handleInvoiceRefunded(array $data): void
+    {
+        $payload = $data['data'] ?? [];
+        $invoiceId = $payload['invoice_id'] ?? null;
+        $amount = isset($payload['refund_amount']) ? (float) $payload['refund_amount'] : (isset($payload['total']) ? (float) $payload['total'] : null);
+        $reason = $payload['reason'] ?? null;
+        $metadata = $payload['metadata'] ?? [];
+
+        event(new AcapaPayInvoiceRefunded($invoiceId, $amount, $reason, $metadata, $data));
+
+        Log::info("AcapaPay SDK: Webhook invoice.refunded validado e evento AcapaPayInvoiceRefunded disparado.");
     }
 }
