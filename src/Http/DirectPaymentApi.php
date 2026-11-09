@@ -243,6 +243,13 @@ class DirectPaymentApi
             $body['reason'] = $reason;
         }
 
-        return $this->client->post("/v1/billing/invoices/{$invoiceId}/refund", $body);
+        $res = $this->client->post("/v1/billing/invoices/{$invoiceId}/refund", $body);
+
+        // Garante compatibilidade direta se a resposta vier encapsulada em 'data'
+        if (isset($res['data']) && is_array($res['data'])) {
+            return array_merge($res, $res['data']);
+        }
+
+        return $res;
     }
 }
