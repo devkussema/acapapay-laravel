@@ -106,9 +106,12 @@ AcapaPay::direct()->refund($invoiceId, $amount, $reason);
 
 ## 4. Requisitos e Regras de Negócio
 
-1. **Estado da Fatura:** Apenas faturas com status `paid` ou `partially_refunded` podem ser reembolsadas. Tentar reembolsar faturas `pending` ou `cancelled` lançará um erro HTTP 422.
-2. **Saldo em TPA Virtual (Live):** Em ambiente de produção, a sua conta de comerciante na AppyPay deve possuir **saldo disponível suficiente** no TPA Virtual do banco liquidante para cobrir o estorno. Se o saldo for insuficiente, a AppyPay rejeitará a operação com o código correspondente.
-3. **Limite de Montante:** O montante solicitado não pode exceder o total da fatura menos o valor já estornado anteriormente.
+1. **Estado da Fatura:** Apenas faturas com status `paid` ou `partially_refunded` podem ser reembolsadas. Tentar reembolsar faturas `pending` ou `cancelled` lançará um erro HTTP 422 (`ValidationException`).
+2. **Janela Temporal de 30 Dias (GPO Real):** Em pagamentos reais por Multicaixa Express (GPO), a rede interbancária EMIS e a AppyPay impõem um limite operacional estrito de **até 30 dias** após a data de pagamento para realização de estornos automáticos via API. Transações fora deste prazo exigem reconciliação manual junto do suporte bancário.
+3. **Saldo em TPA Virtual (Live):** Em ambiente de produção, a sua conta de comerciante na AppyPay deve possuir **saldo disponível suficiente** no TPA Virtual do banco liquidante para cobrir o valor da devolução.
+4. **Identificação 100% Automática:** A sua aplicação satélite apenas necessita de indicar o `invoiceId` da fatura. O AcapaDev ID associa, persiste e resolve o identificador de cobrança original da AppyPay de forma totalmente automática e transparente.
+5. **Conformidade Bancária do Motivo:** A rede EMIS impõe limites estritos de carateres na descrição da transação. A API e o SDK tratam disso automaticamente: se fornecer um motivo customizado, ele é sanitizado e limitado a 20 carateres; caso seja omitido, o sistema envia o termo padrão seguro `"Reembolso"`. O motivo completo continua preservado na íntegra nos registos de auditoria e webhooks internos.
+6. **Limite de Montante:** O montante solicitado não pode exceder o total da fatura menos o somatório de valores já estornados anteriormente.
 
 ---
 
