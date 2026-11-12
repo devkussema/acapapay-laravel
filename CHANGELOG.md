@@ -7,6 +7,32 @@ e o versionamento segue o [SemVer](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.6.0] — 2026-11-12
+
+Suporte oficial a pagamentos **Multicaixa Express via Deeplink (`GPO_DEEPLINK`)** e **Código QR EMIS (`GPO_QR`)**, novos atalhos no SDK e na Facade, métodos auxiliares de extração em `ChargeResult`, idempotência e documentação aprimorada.
+
+### Adicionado
+
+- **Novos Métodos de Pagamento:**
+  - `PaymentMethod::GPO_DEEPLINK`: Multicaixa Express via Deeplink (`mcxwallet://purchase?...`) para abertura direta da app oficial no dispositivo móvel. Validade de 15 minutos.
+  - `PaymentMethod::GPO_QR`: Multicaixa Express via Código QR EMIS oficial para escaneamento com câmara. Validade de 3 dias.
+  - Atualização dos métodos `PaymentMethod::all()`, `label()`, `requiresPhoneNumber()` e `supportsRefund()`.
+- **Atalhos na API Direta (`DirectPaymentApi`):**
+  - `AcapaPay::direct()->chargeWithDeeplink(string $invoiceId): ChargeResult`
+  - `AcapaPay::direct()->chargeWithQrCode(string $invoiceId): ChargeResult`
+- **Atalhos na Facade Principal (`AcapaPay` / `AcapaPayManager`):**
+  - `AcapaPay::createDeeplinkCharge(array $invoiceAttributes): ChargeResult`
+  - `AcapaPay::createQrCharge(array $invoiceAttributes): ChargeResult`
+- **Novos Helpers no `ChargeResult`:**
+  - `$charge->deeplink()`: Devolve o URI de deeplink pronto a abrir na aplicação móvel.
+  - `$charge->qrCode()`: Devolve a string Base64 bruta do código QR EMIS.
+  - `$charge->qrCodeImage()`: Devolve a Data URI pronta para o atributo `src` de uma tag `<img>` (`data:image/png;base64,...`).
+  - `$charge->hasDeeplink()` e `$charge->hasQrCode()`.
+- **Documentação e Idempotência:**
+  - Guia detalhado de Deeplink e QR Code com exemplos práticos em Blade e boas práticas de idempotência e validação de segurança HMAC.
+
+---
+
 ## [1.5.0] — 2026-11-08
 
 Suporte oficial a **Reembolsos e Estornos Automatizados (Refunds)**, novo evento `AcapaPayInvoiceRefunded`, suporte aprimorado ao gateway **AppyPay v2.0**, e reorganização profissional da documentação por versões (`docs/v1.5.0/`).

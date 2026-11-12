@@ -154,6 +154,28 @@ class DirectPaymentApi
     }
 
     /**
+     * Atalho para uma cobrança via Multicaixa Express Deeplink (AOA).
+     * Devolve o link mcxwallet://purchase?... pronto a abrir no dispositivo móvel.
+     *
+     * @since 1.6.0
+     */
+    public function chargeWithDeeplink(string $invoiceId): ChargeResult
+    {
+        return $this->charge($invoiceId, PaymentMethod::GPO_DEEPLINK);
+    }
+
+    /**
+     * Atalho para uma cobrança via Multicaixa Express Código QR EMIS (AOA).
+     * Devolve a imagem Base64 do QR Code pronto para ser escaneado.
+     *
+     * @since 1.6.0
+     */
+    public function chargeWithQrCode(string $invoiceId): ChargeResult
+    {
+        return $this->charge($invoiceId, PaymentMethod::GPO_QR);
+    }
+
+    /**
      * Atalho para uma cobrança via WiPay (checkout hospedado, AOA).
      *
      * @param string|null $phoneNumber Opcional — a WiPay aceita telefone ou

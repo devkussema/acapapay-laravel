@@ -94,6 +94,68 @@ final class ChargeResult implements \ArrayAccess, \JsonSerializable
     }
 
     /**
+     * URI de Deeplink para abrir diretamente a app Multicaixa Express (método GPO_DEEPLINK).
+     * Exemplo: mcxwallet://purchase?...
+     *
+     * @since 1.6.0
+     */
+    public function deeplink(): ?string
+    {
+        return $this->payload['data']['deeplink'] ?? null;
+    }
+
+    /**
+     * String Base64 bruta do Código QR EMIS (método GPO_QR).
+     * Pode ser inserida diretamente numa tag `<img src="data:image/png;base64,...">`.
+     *
+     * @since 1.6.0
+     */
+    public function qrCode(): ?string
+    {
+        return $this->payload['data']['qrCodeArr'] ?? $this->payload['data']['qr_code'] ?? null;
+    }
+
+    /**
+     * Data URI completa pronta a usar no atributo `src` de uma imagem HTML:
+     * `<img src="{{ $result->qrCodeImage() }}" alt="Código QR EMIS">`.
+     *
+     * @since 1.6.0
+     */
+    public function qrCodeImage(): ?string
+    {
+        $qr = $this->qrCode();
+        if (!$qr) {
+            return null;
+        }
+
+        if (str_starts_with($qr, 'data:image/')) {
+            return $qr;
+        }
+
+        return 'data:image/png;base64,' . $qr;
+    }
+
+    /**
+     * A cobrança possui código QR EMIS disponível?
+     *
+     * @since 1.6.0
+     */
+    public function hasQrCode(): bool
+    {
+        return !empty($this->qrCode());
+    }
+
+    /**
+     * A cobrança possui deeplink para abertura direta da app?
+     *
+     * @since 1.6.0
+     */
+    public function hasDeeplink(): bool
+    {
+        return !empty($this->deeplink());
+    }
+
+    /**
      * As carteiras de criptomoeda suportadas pela RedotPay para esta cobrança
      * (Phantom, Rainbow, TronLink, etc.), tal como a RedotPay as devolveu —
      * cada uma com o seu nome, logótipo e os links de pagamento/QR.

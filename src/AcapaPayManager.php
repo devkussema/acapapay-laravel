@@ -289,6 +289,38 @@ class AcapaPayManager
     }
 
     /**
+     * Atalho: cria uma fatura em AOA e gera de imediato o Deeplink do Multicaixa Express.
+     *
+     * @param array<string, mixed> $invoiceAttributes Ver DirectPaymentApi::createInvoice()
+     *
+     * @since 1.6.0
+     */
+    public function createDeeplinkCharge(array $invoiceAttributes): \AcapaPay\Laravel\Support\ChargeResult
+    {
+        $invoiceAttributes['currency'] = $invoiceAttributes['currency'] ?? \AcapaPay\Laravel\Enums\Currency::AOA;
+
+        $invoice = $this->direct()->createInvoice($invoiceAttributes);
+
+        return $this->direct()->chargeWithDeeplink((string) $invoice['invoice_id']);
+    }
+
+    /**
+     * Atalho: cria uma fatura em AOA e gera de imediato o Código QR EMIS do Multicaixa Express.
+     *
+     * @param array<string, mixed> $invoiceAttributes Ver DirectPaymentApi::createInvoice()
+     *
+     * @since 1.6.0
+     */
+    public function createQrCharge(array $invoiceAttributes): \AcapaPay\Laravel\Support\ChargeResult
+    {
+        $invoiceAttributes['currency'] = $invoiceAttributes['currency'] ?? \AcapaPay\Laravel\Enums\Currency::AOA;
+
+        $invoice = $this->direct()->createInvoice($invoiceAttributes);
+
+        return $this->direct()->chargeWithQrCode((string) $invoice['invoice_id']);
+    }
+
+    /**
      * Solicita o estorno/reembolso de uma fatura paga.
      * Atalho para direct()->refund($invoiceId, $amount, $reason).
      *

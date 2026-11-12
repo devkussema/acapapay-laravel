@@ -20,6 +20,12 @@ final class PaymentMethod
     /** Multicaixa Express (Angola, AOA). Validade: 60 segundos. */
     public const GPO = 'GPO';
 
+    /** Multicaixa Express via Deeplink (Angola, AOA). Abre a app Multicaixa Express. Validade: 15 minutos. @since 1.6.0 */
+    public const GPO_DEEPLINK = 'GPO_DEEPLINK';
+
+    /** Multicaixa Express via Código QR EMIS (Angola, AOA). Validade: 3 dias. @since 1.6.0 */
+    public const GPO_QR = 'GPO_QR';
+
     /** E-Kwanza (Angola, AOA). Validade: 5 minutos. */
     public const EKZ = 'EKZ';
 
@@ -41,7 +47,7 @@ final class PaymentMethod
      */
     public static function all(): array
     {
-        return [self::REF, self::GPO, self::EKZ, self::RDP, self::WIP];
+        return [self::REF, self::GPO, self::GPO_DEEPLINK, self::GPO_QR, self::EKZ, self::RDP, self::WIP];
     }
 
     public static function isValid(string $method): bool
@@ -51,6 +57,7 @@ final class PaymentMethod
 
     /**
      * Métodos que exigem o número de telemóvel do cliente.
+     * Nota: GPO_DEEPLINK e GPO_QR não necessitam de número de telemóvel prévio.
      */
     public static function requiresPhoneNumber(string $method): bool
     {
@@ -72,7 +79,9 @@ final class PaymentMethod
     {
         return match ($method) {
             self::REF => 'Referência Multicaixa',
-            self::GPO => 'Multicaixa Express',
+            self::GPO => 'Multicaixa Express (Telefone)',
+            self::GPO_DEEPLINK => 'Multicaixa Express (Deeplink)',
+            self::GPO_QR => 'Multicaixa Express (Código QR EMIS)',
             self::EKZ => 'E-Kwanza',
             self::RDP => 'Criptomoeda (RedotPay)',
             self::WIP => 'WiPay',
@@ -87,6 +96,6 @@ final class PaymentMethod
      */
     public static function supportsRefund(string $method): bool
     {
-        return $method === self::GPO;
+        return in_array($method, [self::GPO, self::GPO_DEEPLINK, self::GPO_QR], true);
     }
 }

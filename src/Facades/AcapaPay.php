@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Facade;
  * @method static \AcapaPay\Laravel\Http\DirectPaymentApi direct()
  * @method static \AcapaPay\Laravel\Http\DirectPaymentApi invoices()
  * @method static \AcapaPay\Laravel\Support\ChargeResult createCryptoCharge(array $invoiceAttributes)
+ * @method static \AcapaPay\Laravel\Support\ChargeResult createDeeplinkCharge(array $invoiceAttributes)
+ * @method static \AcapaPay\Laravel\Support\ChargeResult createQrCharge(array $invoiceAttributes)
  * @method static array refund(string $invoiceId, ?float $amount = null, ?string $reason = null)
  * @method static array ping()
  *
