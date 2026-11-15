@@ -335,4 +335,46 @@ class AcapaPayManager
     {
         return $this->direct()->refund($invoiceId, $amount, $reason);
     }
+
+    /**
+     * Consulta o saldo disponível da aplicação, configurações bancárias e histórico de saques.
+     *
+     * @param int $page Página de resultados do histórico de saques
+     * @return array<string, mixed>
+     *
+     * @since 1.6.0
+     */
+    public function getPayouts(int $page = 1): array
+    {
+        return $this->client->request('GET', '/api/v1/billing/payouts', [], ['page' => $page]);
+    }
+
+    /**
+     * Solicita um saque manual para a aplicação autenticada.
+     * Age exactamente como se o utilizador tivesse solicitado no portal payments.*.
+     *
+     * @param float $amount Valor bruto do saque em AOA (Kz)
+     * @return array<string, mixed>
+     *
+     * @since 1.6.0
+     */
+    public function requestPayout(float $amount): array
+    {
+        return $this->client->request('POST', '/api/v1/billing/payouts', [
+            'amount' => $amount,
+        ]);
+    }
+
+    /**
+     * Cancela uma solicitação de saque pendente.
+     *
+     * @param int $payoutId ID do saque no AcapaPay
+     * @return array<string, mixed>
+     *
+     * @since 1.6.0
+     */
+    public function cancelPayout(int $payoutId): array
+    {
+        return $this->client->request('POST', "/api/v1/billing/payouts/{$payoutId}/cancel");
+    }
 }
