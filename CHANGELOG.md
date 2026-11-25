@@ -7,6 +7,30 @@ e o versionamento segue o [SemVer](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.7.0] — 2026-11-25
+
+Suporte oficial à **deteção automática de reembolsos externos no `status()`** (em conjunto com AcapaDev ID `v3.1.0+`), novos helpers de estado de reembolso no SDK e na Facade, e identificação da origem (`external` vs `internal`) no evento `AcapaPayInvoiceRefunded`.
+
+### Adicionado
+
+- **Novos Helpers na API Direta (`DirectPaymentApi`):**
+  - `AcapaPay::direct()->isRefunded(string $invoiceId): bool`
+  - `AcapaPay::direct()->isPartiallyRefunded(string $invoiceId): bool`
+  - `AcapaPay::direct()->hasRefund(string $invoiceId): bool`
+  - `AcapaPay::direct()->hasExternalRefund(string $invoiceId): bool`
+- **Atalhos na Facade Principal (`AcapaPay` / `AcapaPayManager`):**
+  - `AcapaPay::status(string $invoiceId): array`
+  - `AcapaPay::isRefunded(string $invoiceId): bool`
+  - `AcapaPay::hasExternalRefund(string $invoiceId): bool`
+- **Evento `AcapaPayInvoiceRefunded`:**
+  - Nova propriedade `public ?string $refundSource` (`'external'`, `'internal'` ou `null`).
+  - Novo método `$event->isExternal(): bool` para distinguir reembolsos detetados externamente no gateway.
+  - `WebhookController` passa automaticamente `refund_source` ao disparar `AcapaPayInvoiceRefunded`.
+- **Documentação:**
+  - Documentação completa dos novos campos devolvidos por `status()` (`is_refunded`, `is_partially_refunded`, `refunded_amount`, `refund_source`, `external_refund_detected`) e exemplos práticos em `docs/v1.5.0/05-reembolsos-e-estornos.md`.
+
+---
+
 ## [1.6.0] — 2026-11-12
 
 Suporte oficial a pagamentos **Multicaixa Express via Deeplink (`GPO_DEEPLINK`)** e **Código QR EMIS (`GPO_QR`)**, novos atalhos no SDK e na Facade, métodos auxiliares de extração em `ChargeResult`, idempotência e documentação aprimorada.

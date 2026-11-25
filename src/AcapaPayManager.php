@@ -337,6 +337,39 @@ class AcapaPayManager
     }
 
     /**
+     * Consulta o estado de pagamento (e deteta reembolsos externos) de uma fatura.
+     * Atalho para direct()->status($invoiceId).
+     *
+     * @return array<string, mixed>
+     *
+     * @since 1.7.0
+     */
+    public function status(string $invoiceId): array
+    {
+        return $this->direct()->status($invoiceId);
+    }
+
+    /**
+     * Indica se a fatura foi totalmente reembolsada (interna ou externamente).
+     *
+     * @since 1.7.0
+     */
+    public function isRefunded(string $invoiceId): bool
+    {
+        return $this->direct()->isRefunded($invoiceId);
+    }
+
+    /**
+     * Indica se a fatura possui um reembolso externo detetado automaticamente no gateway.
+     *
+     * @since 1.7.0
+     */
+    public function hasExternalRefund(string $invoiceId): bool
+    {
+        return $this->direct()->hasExternalRefund($invoiceId);
+    }
+
+    /**
      * Consulta o saldo disponível da aplicação, configurações bancárias e histórico de saques.
      *
      * @param int $page Página de resultados do histórico de saques

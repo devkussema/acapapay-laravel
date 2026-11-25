@@ -132,8 +132,9 @@ class WebhookController extends Controller
         $amount = isset($payload['refund_amount']) ? (float) $payload['refund_amount'] : (isset($payload['total']) ? (float) $payload['total'] : null);
         $reason = $payload['reason'] ?? null;
         $metadata = $payload['metadata'] ?? [];
+        $refundSource = $payload['refund_source'] ?? null;
 
-        event(new AcapaPayInvoiceRefunded($invoiceId, $amount, $reason, $metadata, $data));
+        event(new AcapaPayInvoiceRefunded($invoiceId, $amount, $reason, $metadata, $data, $refundSource));
 
         Log::info("AcapaPay SDK: Webhook invoice.refunded validado e evento AcapaPayInvoiceRefunded disparado.");
     }

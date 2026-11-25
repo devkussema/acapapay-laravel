@@ -117,6 +117,66 @@ AcapaPay::direct()->refund($invoiceId, $amount, $reason);
 
 ## 5. Webhook `invoice.refunded`
 
-Quando um reembolso é processado (seja disparado pela sua app, pelo painel administrativo ou pelo Portal do Desenvolvedor), o AcapaDev ID despacha automaticamente um webhook assinado para a sua aplicação com o evento `invoice.refunded`.
+Quando um reembolso é processado (seja disparado pela sua app, pelo painel administrativo, pelo Portal do Desenvolvedor ou detetado externamente no gateway), o AcapaDev ID despacha automaticamente um webhook assinado para a sua aplicação com o evento `invoice.refunded`.
 
 O SDK escuta este webhook e dispara o evento Laravel `AcapaPayInvoiceRefunded`. Veja o capítulo [06. Webhooks e Eventos](06-webhooks-e-eventos.md) para detalhes de implementação do Listener.
+
+---
+
+## 6. Deteção de Reembolsos Externos no `status()` (`v1.7.0+`)
+
+Caso um pagamento seja reembolsado **fora** da plataforma AcapaPay (por exemplo, diretamente no Portal do Comerciante AppyPay ou junto do suporte bancário/EMIS), o AcapaDev ID deteta o estorno automaticamente quando o estado da fatura é consultado via `status()` (ou durante a reconciliação periódica / botão **Verificar** em `finance.*`).
+
+### 6.1. Campos devolvidos por `status()`
+
+```php
+use AcapaPay\Laravel\Facades\AcapaPay;
+
+$status = AcapaPay::status($invoiceId);
+// ou: AcapaPay::direct()->status($invoiceId);
+
+// Exemplo de resposta quando há reembolso externo:
+// [
+//     'invoice_status'           => 'refunded',          // ou 'partially_refunded'
+//     'paid_at'                  => '2026-11-25T10:15:00+00:00',
+//     'is_refunded'              => true,
+//     'is_partially_refunded'    => false,
+//     'refunded_amount'          => 50000.00,
+//     'refund_source'            => 'external',          // 'external' | 'internal' | null
+//     'external_refund_detected' => true,                // true quando acabou de ser sincronizado nesta chamada
+//     'transaction'              => [...],
+// ]
+```
+
+### 6.2. Helpers de Verificação Rápida
+
+```php
+AcapaPay::direct()->isRefunded($invoiceId);          // true se totalmente reembolsada
+AcapaPay::direct()->isPartiallyRefunded($invoiceId); // true se parcialmente reembolsada
+AcapaPay::direct()->hasRefund($invoiceId);           // true se reembolsada total ou parcialmente
+AcapaPay::direct()->hasExternalRefund($invoiceId);   // true se a origem do estorno for externa
+
+// Atalhos diretos na Facade:
+AcapaPay::status($invoiceId);
+AcapaPay::isRefunded($invoiceId);
+AcapaPay::hasExternalRefund($invoiceId);
+```
+
+### 6.3. Identificar Reembolsos Externos no Listener do Webhook
+
+Quando um reembolso externo é detetado pela primeira vez, o servidor dispara automaticamente o webhook `invoice.refunded` com `refund_source: "external"`. No seu Listener Laravel:
+
+```php
+use AcapaPay\Laravel\Events\AcapaPayInvoiceRefunded;
+
+public function handle(AcapaPayInvoiceRefunded $event): void
+{
+    if ($event->isExternal()) {
+        Log::warning("Reembolso externo detetado no gateway para a fatura {$event->invoiceId}", [
+            'amount' => $event->amount,
+            'source' => $event->refundSource, // 'external'
+        ]);
+    }
+}
+```
+

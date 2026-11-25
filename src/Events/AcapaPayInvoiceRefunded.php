@@ -42,6 +42,13 @@ class AcapaPayInvoiceRefunded
     public array $webhookPayload;
 
     /**
+     * Origem do reembolso: 'external' (detetado no gateway), 'internal' (API/painel) ou null.
+     *
+     * @since 1.7.0
+     */
+    public ?string $refundSource;
+
+    /**
      * Cria uma nova instância do evento.
      */
     public function __construct(
@@ -49,12 +56,25 @@ class AcapaPayInvoiceRefunded
         ?float $amount,
         ?string $reason,
         array $metadata = [],
-        array $webhookPayload = []
+        array $webhookPayload = [],
+        ?string $refundSource = null
     ) {
         $this->invoiceId = $invoiceId;
         $this->amount = $amount;
         $this->reason = $reason;
         $this->metadata = $metadata;
         $this->webhookPayload = $webhookPayload;
+        $this->refundSource = $refundSource ?? ($webhookPayload['data']['refund_source'] ?? null);
+    }
+
+    /**
+     * Indica se o reembolso foi efetuado externamente (ex: portal AppyPay/banco)
+     * e detetado automaticamente pelo AcapaPay.
+     *
+     * @since 1.7.0
+     */
+    public function isExternal(): bool
+    {
+        return $this->refundSource === 'external';
     }
 }

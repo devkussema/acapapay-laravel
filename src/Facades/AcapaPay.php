@@ -15,6 +15,12 @@ use Illuminate\Support\Facades\Facade;
  * @method static \AcapaPay\Laravel\Support\ChargeResult createDeeplinkCharge(array $invoiceAttributes)
  * @method static \AcapaPay\Laravel\Support\ChargeResult createQrCharge(array $invoiceAttributes)
  * @method static array refund(string $invoiceId, ?float $amount = null, ?string $reason = null)
+ * @method static array status(string $invoiceId)
+ * @method static bool isRefunded(string $invoiceId)
+ * @method static bool hasExternalRefund(string $invoiceId)
+ * @method static array getPayouts(int $page = 1)
+ * @method static array requestPayout(float $amount)
+ * @method static array cancelPayout(int $payoutId)
  * @method static array ping()
  *
  * @see \AcapaPay\Laravel\AcapaPayManager

@@ -195,7 +195,22 @@ class DirectPaymentApi
      * segundos por fatura — chamadas mais frequentes devolvem o último estado
      * conhecido, sem novo pedido externo.
      *
-     * @return array<string, mixed> {invoice_status, paid_at, transaction:{...}}
+     * A partir da v1.7.0 (com AcapaDev ID v3.1.0+), em faturas `paid` ou
+     * `partially_refunded` (fora de sandbox), este endpoint também consulta o
+     * gateway para detetar automaticamente **reembolsos externos** (efetuados
+     * diretamente no portal AppyPay/banco), atualizando o estado da fatura e
+     * disparando o webhook `invoice.refunded` com `refund_source: "external"`.
+     *
+     * @return array<string, mixed> {
+     *     invoice_status: string,
+     *     paid_at: ?string,
+     *     is_refunded: bool,
+     *     is_partially_refunded: bool,
+     *     refunded_amount: float,
+     *     refund_source: ?string,
+     *     external_refund_detected: bool,
+     *     transaction: ?array<string, mixed>
+     * }
      */
     public function status(string $invoiceId): array
     {
@@ -210,6 +225,61 @@ class DirectPaymentApi
     public function isPaid(string $invoiceId): bool
     {
         return ($this->status($invoiceId)['invoice_status'] ?? null) === 'paid';
+    }
+
+    /**
+     * A fatura foi totalmente reembolsada (interna ou externamente)?
+     *
+     * @since 1.7.0
+     */
+    public function isRefunded(string $invoiceId): bool
+    {
+        $status = $this->status($invoiceId);
+
+        return ($status['is_refunded'] ?? false) === true
+            || ($status['invoice_status'] ?? null) === 'refunded';
+    }
+
+    /**
+     * A fatura foi parcialmente reembolsada (interna ou externamente)?
+     *
+     * @since 1.7.0
+     */
+    public function isPartiallyRefunded(string $invoiceId): bool
+    {
+        $status = $this->status($invoiceId);
+
+        return ($status['is_partially_refunded'] ?? false) === true
+            || ($status['invoice_status'] ?? null) === 'partially_refunded';
+    }
+
+    /**
+     * A fatura possui algum reembolso (total ou parcial)?
+     *
+     * @since 1.7.0
+     */
+    public function hasRefund(string $invoiceId): bool
+    {
+        $status = $this->status($invoiceId);
+        $invoiceStatus = $status['invoice_status'] ?? null;
+
+        return in_array($invoiceStatus, ['refunded', 'partially_refunded'], true)
+            || ($status['is_refunded'] ?? false) === true
+            || ($status['is_partially_refunded'] ?? false) === true
+            || (float) ($status['refunded_amount'] ?? 0) > 0;
+    }
+
+    /**
+     * Foi detetado um reembolso externo (efetuado fora do AcapaPay, ex: portal AppyPay/banco)?
+     *
+     * @since 1.7.0
+     */
+    public function hasExternalRefund(string $invoiceId): bool
+    {
+        $status = $this->status($invoiceId);
+
+        return ($status['refund_source'] ?? null) === 'external'
+            || ($status['external_refund_detected'] ?? false) === true;
     }
 
     /**
